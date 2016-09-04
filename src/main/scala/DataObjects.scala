@@ -88,7 +88,25 @@ case class CSVTick(id: Long, timestamp: Timestamp, currencyPair: String,
                    loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
                    loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
                    loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
-                   loanOfferAmountSum: Option[BigDecimal], loanOfferAmountSumRelToVol: Option[BigDecimal])
+                   loanOfferAmountSum: Option[BigDecimal], loanOfferAmountSumRelToVol: Option[BigDecimal]) {
+
+  def withFractionsAsPercent: CSVTick = this.copy(
+    bidPriceAvg1 = bidPriceAvg1.map(100 * _), bidPriceAvg10 = bidPriceAvg10.map(100 * _),
+    bidPriceAvg25 = bidPriceAvg25.map(100 * _), bidPriceAvg50 = bidPriceAvg50.map(100 * _),
+    bidPriceAvg100 = bidPriceAvg100.map(100 * _), bidPriceAvg500 = bidPriceAvg500.map(100 * _),
+    bidPriceAvg1000 = bidPriceAvg1000.map(100 * _), bidPriceAvg2500 = bidPriceAvg2500.map(100 * _),
+    bidPriceAvg5000 = bidPriceAvg5000.map(100 * _), bidPriceAvg10000 = bidPriceAvg10000.map(100 * _),
+    askPriceAvg1 = askPriceAvg1.map(100 * _), askPriceAvg10 = askPriceAvg10.map(100 * _),
+    askPriceAvg25 = askPriceAvg25.map(100 * _), askPriceAvg50 = askPriceAvg50.map(100 * _),
+    askPriceAvg100 = askPriceAvg100.map(100 * _), askPriceAvg500 = askPriceAvg500.map(100 * _),
+    askPriceAvg1000 = askPriceAvg1000.map(100 * _), askPriceAvg2500 = askPriceAvg2500.map(100 * _),
+    askPriceAvg5000 = askPriceAvg5000.map(100 * _), askPriceAvg10000 = askPriceAvg10000.map(100 * _),
+    loanOfferRateAvg1 = loanOfferRateAvg1.map(100 * _), loanOfferRateAvg10 = loanOfferRateAvg10.map(100 * _),
+    loanOfferRateAvg25 = loanOfferRateAvg25.map(100 * _), loanOfferRateAvg50 = loanOfferRateAvg50.map(100 * _),
+    loanOfferRateAvg100 = loanOfferRateAvg100.map(100 * _), loanOfferRateAvg500 = loanOfferRateAvg500.map(100 * _),
+    loanOfferRateAvg1000 = loanOfferRateAvg1000.map(100 * _), loanOfferRateAvg2500 = loanOfferRateAvg2500.map(100 * _),
+    loanOfferRateAvg5000 = loanOfferRateAvg5000.map(100 * _), loanOfferRateAvg10000 = loanOfferRateAvg10000.map(100 * _))
+}
 
 object CSVTick {
   implicit val getCSVTickResult = GetResult(r => CSVTick(

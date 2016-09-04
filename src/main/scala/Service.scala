@@ -65,23 +65,31 @@ trait Service extends JsonProtocols {
       timestamp.toInstant.atZone(ZoneOffset.UTC).format(formatter)
   }
 
-  def streamCSV(sqlAction: SqlStreamingAction[Vector[CSVTick], CSVTick, Effect], format: String): ToResponseMarshallable = {
+  def streamCSV(sqlAction: SqlStreamingAction[Vector[CSVTick], CSVTick, Effect],
+                dateFormat: String, fractionsAsPercent: Boolean): ToResponseMarshallable = {
+
     val tickPublisher = DB.get.stream(
       sqlAction.withStatementParameters(statementInit = DB.enableStream)
     )
 
     val headerSource = Source.single(CSVLine(csvHeader))
 
-    val tickSource = format match {
-      case "special" =>
-        implicit val converter = germanTimestampConverter
-        Source.fromPublisher(tickPublisher).map(t => CSVLine(t.toCSV()))
+    var tickSource = Source.fromPublisher(tickPublisher)
 
+    tickSource = if (fractionsAsPercent)
+      tickSource.map(_.withFractionsAsPercent)
+    else
+      tickSource
+
+    val csvLineSource = dateFormat match {
+      case "german" =>
+        implicit val converter = germanTimestampConverter
+        tickSource.map(t => CSVLine(t.toCSV()))
       case _ =>
-        Source.fromPublisher(tickPublisher).map(t => CSVLine(t.toCSV()))
+        tickSource.map(t => CSVLine(t.toCSV()))
     }
 
-    Source.combine(headerSource, tickSource)(Concat(_))
+    Source.combine(headerSource, csvLineSource)(Concat(_))
   }
 
   val routes = {
@@ -90,22 +98,26 @@ trait Service extends JsonProtocols {
         pathPrefix("csv") {
           pathSingleSlash {
             get {
-              parameters('format ? "default") { format =>
+              parameters(
+                Symbol("date-format") ? "default",
+                Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
                 complete {
-                  streamCSV(CSVTick.getAllTicks, format)
+                  streamCSV(CSVTick.getAllTicks, dateFormat, fractionsAsPercent)
                 }
               }
             }
           } ~
-          path(Segment) { currencyPair =>
-            get {
-              parameters('format ? "default") { format =>
-                complete {
-                  streamCSV(CSVTick.getTicksForCurrency(currencyPair), format)
+            path(Segment) { currencyPair =>
+              get {
+                parameters(
+                  Symbol("date-format") ? "default",
+                  Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
+                  complete {
+                    streamCSV(CSVTick.getTicksForCurrency(currencyPair), dateFormat, fractionsAsPercent)
+                  }
                 }
               }
             }
-          }
         }
       }
     }
