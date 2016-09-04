@@ -117,7 +117,7 @@ object CSVTick {
                  tick.ask_amount_sum_75percent, tick.ask_amount_sum_85percent, tick.ask_amount_sum_100percent, tick.ask_amount_sum_200percent,
                  tick.loan_offer_rate_avg_1, tick.loan_offer_rate_avg_10, tick.loan_offer_rate_avg_25, tick.loan_offer_rate_avg_50, tick.loan_offer_rate_avg_100,
                  tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
-                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / avg(past.volume)
+                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
           from ticks tick, ticks past
           where tick.chart_data_final and past.currency_pair = tick.currency_pair and
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
@@ -137,7 +137,7 @@ object CSVTick {
                  tick.ask_amount_sum_75percent, tick.ask_amount_sum_85percent, tick.ask_amount_sum_100percent, tick.ask_amount_sum_200percent,
                  tick.loan_offer_rate_avg_1, tick.loan_offer_rate_avg_10, tick.loan_offer_rate_avg_25, tick.loan_offer_rate_avg_50, tick.loan_offer_rate_avg_100,
                  tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
-                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / avg(past.volume)
+                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
           from ticks tick, ticks past
           where tick.chart_data_final and tick.currency_pair = $currencyPair and past.currency_pair = tick.currency_pair and
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
