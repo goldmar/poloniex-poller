@@ -1,5 +1,5 @@
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time._
 import java.time.format.DateTimeFormatter
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -62,7 +62,7 @@ trait Service extends JsonProtocols {
       Try(Timestamp.valueOf(LocalDateTime.parse(str, formatter)))
 
     override def to(timestamp: Timestamp): String =
-      timestamp.toLocalDateTime.format(formatter)
+      timestamp.toInstant.atZone(ZoneOffset.UTC).format(formatter)
   }
 
   def streamCSV(sqlAction: SqlStreamingAction[Vector[CSVTick], CSVTick, Effect], format: String): ToResponseMarshallable = {

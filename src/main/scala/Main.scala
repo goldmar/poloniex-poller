@@ -1,5 +1,5 @@
 import java.sql.SQLSyntaxErrorException
-import java.time.{ZoneOffset, ZonedDateTime}
+import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
 import slick.jdbc.MySQLProfile.api._
 import akka.actor.{ActorSystem, Props}
@@ -53,9 +53,8 @@ object Main extends App with Service {
   }
 
   val poloniexDataSaver = system.actorOf(Props[PoloniexDataSaverActor])
-  val now = ZonedDateTime.now(ZoneOffset.UTC)
-  //system.scheduler.scheduleOnce(6 minutes, poloniexDataSaver, RequestUpdateOldCandles(now.toEpochSecond))
-  poloniexDataSaver ! RequestUpdateOldCandles(now.toEpochSecond)
+  val now = Instant.now.getEpochSecond
+  system.scheduler.scheduleOnce(6 minutes, poloniexDataSaver, RequestUpdateOldCandles(now))
 
   scheduler.schedule("Every5Minutes", poloniexDataSaver, Poll)
 
