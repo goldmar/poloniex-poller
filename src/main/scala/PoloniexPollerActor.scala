@@ -7,7 +7,6 @@ import scala.collection.immutable.{Map, SortedSet}
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.{after, pipe}
 import akka.http.scaladsl.Http
@@ -29,9 +28,9 @@ case class FetchOldChartData(start: Long, end: Long)
 case class InsertCandles(timestamp: Long, t: Map[String, BigDecimal],
                          obs: Map[String, OrderBook], los: Map[String, LoanOrderBook])
 
-case class UpdateCandles(timestamp: Long, cds: Map[String, Option[ChartDataCandle]])
+case class UpsertCandleChartData(timestamp: Long, cds: Map[String, Option[ChartDataCandle]])
 
-case class UpdateOldCandles(from: Long, until: Long, cds: Map[Long, Map[String, ChartDataCandle]])
+case class OldCandleChartData(cds: Map[Long, Map[String, ChartDataCandle]])
 
 class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   implicit val system = context.system
@@ -86,10 +85,10 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     }
   }
 
-  def fetchChartData(start: Long): Future[Map[String, Seq[ChartDataCandle]]] = {
+  def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Seq[ChartDataCandle]]] = {
     val requests = for (c <- allCurrencies) yield
       poloniexRequest(RequestBuilding.Get(
-        s"/public?command=returnChartData&currencyPair=$c&start=$start&end=9999999999&period=300")
+        s"/public?command=returnChartData&currencyPair=$c&start=$start&end=$end&period=300")
       ).map(c -> _)
     Future.sequence(requests).flatMap { seq =>
       val mappedSeq: Seq[Future[(String, Seq[ChartDataCandle])]] =
@@ -107,6 +106,16 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         }
       Future.sequence(mappedSeq).map(_.toMap)
     }
+  }
+
+  def fetchChartDataAsNestedMap(start: Long, end: Long): Future[Map[Long, Map[String, ChartDataCandle]]] = {
+    fetchChartData(start, end).map(_.toSeq.flatMap { case (c, cdSeq) =>
+      cdSeq.map(cdc => (c, cdc))
+    }.groupBy(_._2.timestamp).map { case (timestamp, candles) =>
+      timestamp -> candles.groupBy(_._1).map { case (c, tuples) =>
+        c -> tuples.head._2
+      }
+    })
   }
 
   def fetchOrderBooks(): Future[Map[String, OrderBook]] = {
@@ -191,21 +200,15 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
             case (c, candle) if candle.timestamp == timestamp => c -> Some(candle)
             case (c, candle) => c -> None
           }
-          s ! UpdateCandles(timestamp, candleOptions)
+          s ! UpsertCandleChartData(timestamp, candleOptions)
         case Failure(e) =>
-          log.error(e, "Poloniex Volume Update failed")
+          log.error(e, "Poloniex Chart Data Update failed")
       }
 
     case FetchOldChartData(start, end) =>
       val s = sender()
-      fetchChartData(start).map(_.toSeq.flatMap { case (c, cdSeq) =>
-        cdSeq.map(cdc => (c, cdc))
-      }.groupBy(_._2.timestamp).map { case (timestamp, candles) =>
-        timestamp -> candles.groupBy(_._1).map { case (c, tuples) =>
-          c -> tuples.head._2
-        }
-      }).map { cds =>
-        UpdateOldCandles(start, end, cds)
+      fetchChartDataAsNestedMap(start, end).map { cds =>
+        OldCandleChartData(cds)
       } pipeTo s
   }
 }

@@ -1,4 +1,5 @@
 import java.sql.Timestamp
+import java.time._
 
 import slick.jdbc.MySQLProfile.api._
 import shapeless.{Generic, HList, HNil}
@@ -6,46 +7,6 @@ import slick.sql.SqlProfile.ColumnOption.SqlType
 import slickless._
 
 object Schema {
-
-  case class MySQLInterval()
-
-  val subtractDays = SimpleExpression.binary[Timestamp, Int, Timestamp] { (timestamp, days, qb) =>
-    qb.sqlBuilder += "date_sub("
-    qb.expr(timestamp)
-    qb.sqlBuilder += ", interval "
-    qb.expr(days)
-    qb.sqlBuilder += " day)"
-  }
-
-  case class Tick(id: Long, timestamp: Timestamp, currencyPair: String,
-                  open: Option[BigDecimal], high: Option[BigDecimal],
-                  low: Option[BigDecimal], close: Option[BigDecimal],
-                  volume: Option[BigDecimal], chartDataFinal: Boolean,
-                  bidAskMidpoint: Option[BigDecimal],
-                  bidPriceAvg1: Option[BigDecimal], bidPriceAvg10: Option[BigDecimal],
-                  bidPriceAvg25: Option[BigDecimal], bidPriceAvg50: Option[BigDecimal],
-                  bidPriceAvg100: Option[BigDecimal], bidPriceAvg500: Option[BigDecimal],
-                  bidPriceAvg1000: Option[BigDecimal], bidPriceAvg2500: Option[BigDecimal],
-                  bidPriceAvg5000: Option[BigDecimal], bidPriceAvg10000: Option[BigDecimal],
-                  askPriceAvg1: Option[BigDecimal], askPriceAvg10: Option[BigDecimal],
-                  askPriceAvg25: Option[BigDecimal], askPriceAvg50: Option[BigDecimal],
-                  askPriceAvg100: Option[BigDecimal], askPriceAvg500: Option[BigDecimal],
-                  askPriceAvg1000: Option[BigDecimal], askPriceAvg2500: Option[BigDecimal],
-                  askPriceAvg5000: Option[BigDecimal], askPriceAvg10000: Option[BigDecimal],
-                  bidAmountSum5percent: BigDecimal, bidAmountSum10percent: BigDecimal,
-                  bidAmountSum25percent: BigDecimal, bidAmountSum50percent: BigDecimal,
-                  bidAmountSum75percent: BigDecimal, bidAmountSum85percent: BigDecimal,
-                  bidAmountSum100percent: BigDecimal, askAmountSum5percent: BigDecimal,
-                  askAmountSum10percent: BigDecimal, askAmountSum25percent: BigDecimal,
-                  askAmountSum50percent: BigDecimal, askAmountSum75percent: BigDecimal,
-                  askAmountSum85percent: BigDecimal, askAmountSum100percent: BigDecimal,
-                  askAmountSum200percent: BigDecimal,
-                  loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg10: Option[BigDecimal],
-                  loanOfferRateAvg25: Option[BigDecimal], loanOfferRateAvg50: Option[BigDecimal],
-                  loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
-                  loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
-                  loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
-                  loanOfferAmountSum: Option[BigDecimal])
 
   class Ticks(tag: Tag) extends Table[Tick](tag, "ticks") {
 
@@ -109,35 +70,35 @@ object Schema {
 
     def askPriceAvg10000 = column[Option[BigDecimal]]("ask_price_avg_10000", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum5percent = column[BigDecimal]("bid_amount_sum_5percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum5percent = column[Option[BigDecimal]]("bid_amount_sum_5percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum10percent = column[BigDecimal]("bid_amount_sum_10percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum10percent = column[Option[BigDecimal]]("bid_amount_sum_10percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum25percent = column[BigDecimal]("bid_amount_sum_25percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum25percent = column[Option[BigDecimal]]("bid_amount_sum_25percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum50percent = column[BigDecimal]("bid_amount_sum_50percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum50percent = column[Option[BigDecimal]]("bid_amount_sum_50percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum75percent = column[BigDecimal]("bid_amount_sum_75percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum75percent = column[Option[BigDecimal]]("bid_amount_sum_75percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum85percent = column[BigDecimal]("bid_amount_sum_85percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum85percent = column[Option[BigDecimal]]("bid_amount_sum_85percent", O.SqlType("DECIMAL(20,8)"))
 
-    def bidAmountSum100percent = column[BigDecimal]("bid_amount_sum_100percent", O.SqlType("DECIMAL(20,8)"))
+    def bidAmountSum100percent = column[Option[BigDecimal]]("bid_amount_sum_100percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum5percent = column[BigDecimal]("ask_amount_sum_5percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum5percent = column[Option[BigDecimal]]("ask_amount_sum_5percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum10percent = column[BigDecimal]("ask_amount_sum_10percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum10percent = column[Option[BigDecimal]]("ask_amount_sum_10percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum25percent = column[BigDecimal]("ask_amount_sum_25percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum25percent = column[Option[BigDecimal]]("ask_amount_sum_25percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum50percent = column[BigDecimal]("ask_amount_sum_50percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum50percent = column[Option[BigDecimal]]("ask_amount_sum_50percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum75percent = column[BigDecimal]("ask_amount_sum_75percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum75percent = column[Option[BigDecimal]]("ask_amount_sum_75percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum85percent = column[BigDecimal]("ask_amount_sum_85percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum85percent = column[Option[BigDecimal]]("ask_amount_sum_85percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum100percent = column[BigDecimal]("ask_amount_sum_100percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum100percent = column[Option[BigDecimal]]("ask_amount_sum_100percent", O.SqlType("DECIMAL(20,8)"))
 
-    def askAmountSum200percent = column[BigDecimal]("ask_amount_sum_200percent", O.SqlType("DECIMAL(20,8)"))
+    def askAmountSum200percent = column[Option[BigDecimal]]("ask_amount_sum_200percent", O.SqlType("DECIMAL(20,8)"))
 
     def loanOfferRateAvg1 = column[Option[BigDecimal]]("loan_offer_rate_avg_1", O.SqlType("DECIMAL(20,8)"))
 
@@ -190,4 +151,46 @@ object Schema {
   }
 
   val ticks = TableQuery[Ticks]
+
+  case class Tick(id: Long, timestamp: Timestamp, currencyPair: String,
+                  open: Option[BigDecimal], high: Option[BigDecimal],
+                  low: Option[BigDecimal], close: Option[BigDecimal],
+                  volume: Option[BigDecimal], chartDataFinal: Boolean,
+                  bidAskMidpoint: Option[BigDecimal],
+                  bidPriceAvg1: Option[BigDecimal], bidPriceAvg10: Option[BigDecimal],
+                  bidPriceAvg25: Option[BigDecimal], bidPriceAvg50: Option[BigDecimal],
+                  bidPriceAvg100: Option[BigDecimal], bidPriceAvg500: Option[BigDecimal],
+                  bidPriceAvg1000: Option[BigDecimal], bidPriceAvg2500: Option[BigDecimal],
+                  bidPriceAvg5000: Option[BigDecimal], bidPriceAvg10000: Option[BigDecimal],
+                  askPriceAvg1: Option[BigDecimal], askPriceAvg10: Option[BigDecimal],
+                  askPriceAvg25: Option[BigDecimal], askPriceAvg50: Option[BigDecimal],
+                  askPriceAvg100: Option[BigDecimal], askPriceAvg500: Option[BigDecimal],
+                  askPriceAvg1000: Option[BigDecimal], askPriceAvg2500: Option[BigDecimal],
+                  askPriceAvg5000: Option[BigDecimal], askPriceAvg10000: Option[BigDecimal],
+                  bidAmountSum5percent: Option[BigDecimal], bidAmountSum10percent: Option[BigDecimal],
+                  bidAmountSum25percent: Option[BigDecimal], bidAmountSum50percent: Option[BigDecimal],
+                  bidAmountSum75percent: Option[BigDecimal], bidAmountSum85percent: Option[BigDecimal],
+                  bidAmountSum100percent: Option[BigDecimal], askAmountSum5percent: Option[BigDecimal],
+                  askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
+                  askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
+                  askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
+                  askAmountSum200percent: Option[BigDecimal],
+                  loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg10: Option[BigDecimal],
+                  loanOfferRateAvg25: Option[BigDecimal], loanOfferRateAvg50: Option[BigDecimal],
+                  loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
+                  loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
+                  loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
+                  loanOfferAmountSum: Option[BigDecimal])
+
+  object Tick {
+    def empty() = Tick(
+      -1, Timestamp.from(Instant.now), "", None, None, None, None, None, false,
+      None, None, None, None, None, None, None, None, None, None,
+      None, None, None, None, None, None, None, None, None, None,
+      None, None, None, None, None, None, None, None, None, None,
+      None, None, None, None, None, None, None, None, None, None,
+      None, None, None, None, None, None, None
+    )
+  }
+
 }

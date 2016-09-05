@@ -2,12 +2,16 @@ import java.sql.Timestamp
 import java.time._
 import java.time.temporal.{ChronoField, ChronoUnit}
 
+import scala.language.postfixOps
 import scala.concurrent._
+import scala.concurrent.duration._
 
 import slick.jdbc.MySQLProfile.api._
 import akka.actor.{Actor, ActorLogging, Props}
+import akka.pattern.ask
 import akka.stream._
 import akka.stream.scaladsl._
+import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import net.ceedubs.ficus.Ficus._
 import sext._
@@ -15,10 +19,14 @@ import Schema._
 
 case class RequestUpdateOldCandles(until: Long)
 
+case class RequestInsertOldCandles(from: Option[Long], until: Long)
+
 class PoloniexDataSaverActor extends Actor with ActorLogging {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
   implicit val materializer = ActorMaterializer()
+
+  implicit val timeout = Timeout(1 minute)
 
   val config = ConfigFactory.load()
 
@@ -91,21 +99,21 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           askPriceAvg2500 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 2500).map(_ / bidAskMidpoint - 1),
           askPriceAvg5000 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 5000).map(_ / bidAskMidpoint - 1),
           askPriceAvg10000 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 10000).map(_ / bidAskMidpoint - 1),
-          bidAmountSum5percent = bids.filter(_.price >= bidAskMidpoint * 0.95).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum10percent = bids.filter(_.price >= bidAskMidpoint * 0.90).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum25percent = bids.filter(_.price >= bidAskMidpoint * 0.75).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum50percent = bids.filter(_.price >= bidAskMidpoint * 0.50).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum75percent = bids.filter(_.price >= bidAskMidpoint * 0.25).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum85percent = bids.filter(_.price >= bidAskMidpoint * 0.15).map(_.amount).sum * bidAskMidpoint,
-          bidAmountSum100percent = bids.filter(_.price >= bidAskMidpoint * 0.00).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum5percent = asks.filter(_.price <= bidAskMidpoint * 1.05).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum10percent = asks.filter(_.price <= bidAskMidpoint * 1.10).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum25percent = asks.filter(_.price <= bidAskMidpoint * 1.25).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum50percent = asks.filter(_.price <= bidAskMidpoint * 1.50).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum75percent = asks.filter(_.price <= bidAskMidpoint * 1.75).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum85percent = asks.filter(_.price <= bidAskMidpoint * 1.85).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum100percent = asks.filter(_.price <= bidAskMidpoint * 2.00).map(_.amount).sum * bidAskMidpoint,
-          askAmountSum200percent = asks.filter(_.price <= bidAskMidpoint * 3.00).map(_.amount).sum * bidAskMidpoint,
+          bidAmountSum5percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.95).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum10percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.90).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum25percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.75).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum50percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.50).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum75percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.25).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum85percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.15).map(_.amount).sum * bidAskMidpoint),
+          bidAmountSum100percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.00).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum5percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.05).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum10percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.10).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum25percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.25).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum50percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.50).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum75percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.75).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum85percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.85).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum100percent = Some(asks.filter(_.price <= bidAskMidpoint * 2.00).map(_.amount).sum * bidAskMidpoint),
+          askAmountSum200percent = Some(asks.filter(_.price <= bidAskMidpoint * 3.00).map(_.amount).sum * bidAskMidpoint),
           loanOfferRateAvg1 = aggregateLoanOffers(c, los, bidAskMidpoint, 1),
           loanOfferRateAvg10 = aggregateLoanOffers(c, los, bidAskMidpoint, 10),
           loanOfferRateAvg25 = aggregateLoanOffers(c, los, bidAskMidpoint, 25),
@@ -132,33 +140,49 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         log.error(e, s"Could not insert new data at timestamp $timestamp")
       }
 
-    case UpdateCandles(timestamp, cds) =>
+    case UpsertCandleChartData(timestamp, cds) =>
       val sqlTimestamp = Timestamp.from(Instant.ofEpochSecond(timestamp))
 
       val updates = cds.map { case (c, cdcOption) =>
-        ticks
-          .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c)
-          .map(t =>
-            (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
-          .update(
-            cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
-            cdcOption.map(_.close), cdcOption.map(_.volume), true)
+        for {
+          rowsAffected <- ticks
+            .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c)
+            .map(t =>
+              (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
+            .update(
+              cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
+              cdcOption.map(_.close), cdcOption.map(_.volume), true)
+          result <- rowsAffected match {
+            case 0 => ticks += Tick.empty().copy(
+              timestamp = sqlTimestamp,
+              currencyPair = c,
+              open = cdcOption.map(_.open),
+              high = cdcOption.map(_.high),
+              low = cdcOption.map(_.low),
+              close = cdcOption.map(_.close),
+              volume = cdcOption.map(_.volume),
+              chartDataFinal = true)
+            case 1 => DBIO.successful(1)
+            case n => DBIO.failed(new RuntimeException(
+              s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
+          }
+        } yield result
       }
 
       val result = DB.get.run(DBIO.seq(updates.toSeq: _*))
 
       result onSuccess { case _ =>
-        log.info(s"Updated candles at timestamp $timestamp")
+        log.info(s"Upserted candles at timestamp $timestamp")
       }
 
       result onFailure { case e =>
-        log.error(e, s"Could not update candles at $timestamp")
+        log.error(e, s"Could not upsert candles at $timestamp")
       }
 
     case RequestUpdateOldCandles(until) =>
-      val sqlTimestamp = Timestamp.from(Instant.ofEpochSecond(until))
+      val untilSqlTimestamp = Timestamp.from(Instant.ofEpochSecond(until))
       val query = ticks
-        .filter(t => t.timestamp <= sqlTimestamp && t.chartDataFinal === false)
+        .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
         .sortBy(_.timestamp.asc)
         .map(_.timestamp)
         .take(1)
@@ -167,44 +191,65 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         case Some(timestamp) =>
           val start = timestamp.toInstant.getEpochSecond
           val end = until
+
           log.info(s"Updating old candles since $start")
-          poller ! FetchOldChartData(start, end)
+
+          (poller ? FetchOldChartData(start, end)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
+            val query = ticks
+              .filter(t => t.chartDataFinal === false && t.timestamp <= untilSqlTimestamp)
+              .sortBy(_.timestamp.asc)
+              .map(t => (t.timestamp, t.currencyPair))
+
+            DB.get.run(query.result).foreach { case r =>
+              val tuples = r map { case (sqlTimestamp, c) =>
+                val timestamp = sqlTimestamp.toInstant.getEpochSecond
+                cds.get(timestamp).flatMap(_.get(c)) match {
+                  case Some(candle) =>
+                    (timestamp, c, Some(candle))
+                  case None =>
+                    (timestamp, c, None)
+                }
+              }
+
+              val candles = tuples.groupBy(_._1).map { case (t, tuple) =>
+                t -> tuple.groupBy(_._2).map { case (c, tuple) =>
+                  c -> tuple.head._3
+                }
+              }
+
+              for (t <- candles.keys.toSeq.sorted) {
+                self ! UpsertCandleChartData(t, candles(t))
+              }
+            }
+          }
+
         case None =>
           log.info("All candles are up-to-date")
       }
 
-    case UpdateOldCandles(from, until, cds) =>
-      val endTimestamp = Timestamp.from(Instant.ofEpochSecond(until))
-      val query = ticks
-        .filter(t => t.chartDataFinal === false && t.timestamp < endTimestamp)
-        .sortBy(_.timestamp.asc)
-        .map(t => (t.timestamp, t.currencyPair))
+    case RequestInsertOldCandles(fromOption, until) =>
+      val fromFuture = fromOption match {
+        case Some(from) => Future(from)
 
-      val results = DB.get.run(query.result)
+        case None =>
+          val query = ticks
+            .sortBy(_.timestamp.desc)
+            .map(_.timestamp)
+            .take(1)
 
-      results onSuccess { case r =>
-        val tuples = r map { case (sqlTimestamp, c) =>
-          val timestamp = sqlTimestamp.toInstant.getEpochSecond
-          cds.get(timestamp).flatMap(_.get(c)) match {
-            case Some(candle) =>
-              (timestamp, c, Some(candle))
-            case None =>
-              (timestamp, c, None)
+          DB.get.run(query.result.head).map { case timestamp =>
+            timestamp.toInstant.plus(5, ChronoUnit.MINUTES).getEpochSecond
           }
-        }
+      }
 
-        val candles = tuples.groupBy(_._1).map { case (t, tuple) =>
-          t -> tuple.groupBy(_._2).map { case (c, tuple) =>
-            c -> tuple.head._3
+      fromFuture.foreach { case from =>
+        (poller ? FetchOldChartData(from, until)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
+          for (t <- cds.keys.toSeq.sorted if t >= from && t <= until) {
+            self ! UpsertCandleChartData(t, cds(t).map { case (c, cdc) => c -> Some(cdc) })
           }
-        }
-
-        for (t <- candles.keys.toSeq.sorted) {
-          self ! UpdateCandles(t, candles(t))
         }
       }
   }
-
 }
 
 

@@ -75,14 +75,14 @@ case class CSVTick(id: Long, timestamp: Timestamp, currencyPair: String,
                    askPriceAvg100: Option[BigDecimal], askPriceAvg500: Option[BigDecimal],
                    askPriceAvg1000: Option[BigDecimal], askPriceAvg2500: Option[BigDecimal],
                    askPriceAvg5000: Option[BigDecimal], askPriceAvg10000: Option[BigDecimal],
-                   bidAmountSum5percent: BigDecimal, bidAmountSum10percent: BigDecimal,
-                   bidAmountSum25percent: BigDecimal, bidAmountSum50percent: BigDecimal,
-                   bidAmountSum75percent: BigDecimal, bidAmountSum85percent: BigDecimal,
-                   bidAmountSum100percent: BigDecimal, askAmountSum5percent: BigDecimal,
-                   askAmountSum10percent: BigDecimal, askAmountSum25percent: BigDecimal,
-                   askAmountSum50percent: BigDecimal, askAmountSum75percent: BigDecimal,
-                   askAmountSum85percent: BigDecimal, askAmountSum100percent: BigDecimal,
-                   askAmountSum200percent: BigDecimal,
+                   bidAmountSum5percent: Option[BigDecimal], bidAmountSum10percent: Option[BigDecimal],
+                   bidAmountSum25percent: Option[BigDecimal], bidAmountSum50percent: Option[BigDecimal],
+                   bidAmountSum75percent: Option[BigDecimal], bidAmountSum85percent: Option[BigDecimal],
+                   bidAmountSum100percent: Option[BigDecimal], askAmountSum5percent: Option[BigDecimal],
+                   askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
+                   askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
+                   askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
+                   askAmountSum200percent: Option[BigDecimal],
                    loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg10: Option[BigDecimal],
                    loanOfferRateAvg25: Option[BigDecimal], loanOfferRateAvg50: Option[BigDecimal],
                    loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
@@ -115,12 +115,13 @@ object CSVTick {
     r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
     r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
     r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimal,
-    r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal,
-    r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimal,
-    r.nextBigDecimal, r.nextBigDecimal, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
     r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption)
+    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
+    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
+    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
+    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
+    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
+    r.nextBigDecimalOption)
   )
 
   def getAllTicks() =
@@ -137,10 +138,10 @@ object CSVTick {
                  tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
                  tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
           from ticks tick, ticks past
-          where tick.chart_data_final and past.currency_pair = tick.currency_pair and
+          where tick.chart_data_final and past.chart_data_final and
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
-                past.timestamp <= tick.timestamp
-          group by tick.id
+                past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
+          group by tick.timestamp, tick.currency_pair
           order by tick.timestamp asc, tick.currency_pair asc""".as[CSVTick]
 
   def getTicksForCurrency(currencyPair: String) =
@@ -157,9 +158,9 @@ object CSVTick {
                  tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
                  tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
           from ticks tick, ticks past
-          where tick.chart_data_final and tick.currency_pair = $currencyPair and past.currency_pair = tick.currency_pair and
+          where tick.currency_pair = $currencyPair and tick.chart_data_final and past.chart_data_final and
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
-                past.timestamp <= tick.timestamp
-          group by tick.id
-          order by tick.timestamp asc""".as[CSVTick]
+                past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
+          group by tick.timestamp, tick.currency_pair
+          order by tick.timestamp asc, tick.currency_pair asc""".as[CSVTick]
 }
