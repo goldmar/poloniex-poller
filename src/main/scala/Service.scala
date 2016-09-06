@@ -65,16 +65,19 @@ trait Service extends JsonProtocols {
       timestamp.toInstant.atZone(ZoneOffset.UTC).format(formatter)
   }
 
-  def streamCSV(sqlAction: SqlStreamingAction[Vector[CSVTick], CSVTick, Effect],
+  def streamCSV(countQuery: Rep[Int], sqlAction: (Int, Int) => SqlStreamingAction[Vector[CSVTick], CSVTick, Effect],
                 dateFormat: String, fractionsAsPercent: Boolean): ToResponseMarshallable = {
 
-    val tickPublisher = DB.get.stream(
-      sqlAction.withStatementParameters(statementInit = DB.enableStream)
-    )
+    val limit = 100
 
     val headerSource = Source.single(CSVLine(csvHeader))
 
-    var tickSource = Source.fromPublisher(tickPublisher)
+    val countResult = DB.get.run(countQuery.result)
+
+    var tickSource = Source.fromFuture(countResult)
+      .flatMapConcat(count => Source(0 to count / limit))
+      .mapAsync(1)(i => DB.get.run(sqlAction(limit, i * limit)))
+      .mapConcat(identity)
 
     tickSource = if (fractionsAsPercent)
       tickSource.map(_.withFractionsAsPercent)
@@ -102,22 +105,30 @@ trait Service extends JsonProtocols {
                 Symbol("date-format") ? "default",
                 Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
                 complete {
-                  streamCSV(CSVTick.getAllTicks, dateFormat, fractionsAsPercent)
+                  val countQuery = ticks
+                    .filter(_.chartDataFinal)
+                    .length
+
+                  streamCSV(countQuery, CSVTick.getAllTicks, dateFormat, fractionsAsPercent)
                 }
               }
             }
           } ~
-            path(Segment) { currencyPair =>
-              get {
-                parameters(
-                  Symbol("date-format") ? "default",
-                  Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
-                  complete {
-                    streamCSV(CSVTick.getTicksForCurrency(currencyPair), dateFormat, fractionsAsPercent)
-                  }
+          path(Segment) { currencyPair =>
+            get {
+              parameters(
+                Symbol("date-format") ? "default",
+                Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
+                complete {
+                  val countQuery = ticks
+                    .filter(t => t.chartDataFinal && t.currencyPair === currencyPair)
+                    .length
+
+                  streamCSV(countQuery, CSVTick.getTicksForCurrency(currencyPair), dateFormat, fractionsAsPercent)
                 }
               }
             }
+          }
         }
       }
     }

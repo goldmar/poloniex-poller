@@ -124,7 +124,7 @@ object CSVTick {
     r.nextBigDecimalOption)
   )
 
-  def getAllTicks() =
+  def getAllTicks(limit: Int, offset: Int) =
     sql"""select tick.id, tick.timestamp, tick.currency_pair, tick.open, tick.high, tick.low, tick.close, tick.volume, avg(past.volume),
                  tick.bid_ask_midpoint, tick.bid_price_avg_1, tick.bid_price_avg_10, tick.bid_price_avg_25, tick.bid_price_avg_50,
                  tick.bid_price_avg_100, tick.bid_price_avg_500, tick.bid_price_avg_1000, tick.bid_price_avg_2500, tick.bid_price_avg_5000,
@@ -142,9 +142,10 @@ object CSVTick {
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
                 past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
           group by tick.timestamp, tick.currency_pair
-          order by tick.timestamp asc, tick.currency_pair asc""".as[CSVTick]
+          order by tick.timestamp asc, tick.currency_pair asc
+          limit $limit offset $offset""".as[CSVTick]
 
-  def getTicksForCurrency(currencyPair: String) =
+  def getTicksForCurrency(currencyPair: String)(limit: Int, offset: Int) =
     sql"""select tick.id, tick.timestamp, tick.currency_pair, tick.open, tick.high, tick.low, tick.close, tick.volume, avg(past.volume),
                  tick.bid_ask_midpoint, tick.bid_price_avg_1, tick.bid_price_avg_10, tick.bid_price_avg_25, tick.bid_price_avg_50,
                  tick.bid_price_avg_100, tick.bid_price_avg_500, tick.bid_price_avg_1000, tick.bid_price_avg_2500, tick.bid_price_avg_5000,
@@ -162,5 +163,6 @@ object CSVTick {
                 past.timestamp > date_sub(tick.timestamp, interval 7 day) and
                 past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
           group by tick.timestamp, tick.currency_pair
-          order by tick.timestamp asc, tick.currency_pair asc""".as[CSVTick]
+          order by tick.timestamp asc, tick.currency_pair asc
+          limit $limit offset $offset""".as[CSVTick]
 }
