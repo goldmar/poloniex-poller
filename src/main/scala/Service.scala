@@ -77,7 +77,7 @@ trait Service extends JsonProtocols {
 
     val tickWithVolumeSource = Source.fromPublisher(tickPublisher)
       .scan(Tick.empty(), false, "", BigDecimal(0), Vector.empty[TickInstantVolume]) {
-        case ((tick, complete, currencyPair, volumeSum, window), next) =>
+        case ((tick, weekIsFull, currencyPair, volumeSum, window), next) =>
           val nextC = next.currencyPair
           val nextInstant = next.timestamp.toInstant
           val oneWeekAgo = nextInstant.minus(7, ChronoUnit.DAYS)
@@ -95,11 +95,13 @@ trait Service extends JsonProtocols {
                 next.volume.getOrElse(0),
                 Vector(TickInstantVolume(next.timestamp.toInstant, next.volume)))
           }
-      }.drop(1).map { case (tick, complete, currencyPair, sum, window) =>
-      (complete, window.length) match {
+      }.drop(1).map { case (tick, weekIsFull, currencyPair, sum, window) =>
+      (weekIsFull, window.flatMap(_.volume).length) match {
         case (true, l) if l > 0 => (tick, Some(sum / l))
         case _ => (tick, None)
       }
+    }.dropWhile { case (tick, _) =>
+        tick.bidAskMidpoint.isEmpty
     }
 
     var csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>

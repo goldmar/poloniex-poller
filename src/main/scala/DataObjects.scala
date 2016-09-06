@@ -60,7 +60,7 @@ trait JsonProtocols extends DefaultJsonProtocol {
 
 }
 
-case class CSVTick(id: Long, timestamp: Timestamp, currencyPair: String,
+case class CSVTick(timestamp: Timestamp, currencyPair: String,
                    open: Option[BigDecimal], high: Option[BigDecimal],
                    low: Option[BigDecimal], close: Option[BigDecimal],
                    volume: Option[BigDecimal], volumeAvgPast7Days: Option[BigDecimal],
@@ -114,5 +114,5 @@ object CSVTick {
 
   def fromTick(tick: Tick): CSVTick =
     genericCSVTick.from(
-      genericTick.to(tick).toZipper.rightBy(8).put(None).reify :+ None)
+      genericTick.to(tick).toZipper.delete.rightBy(7).put(None).reify :+ None)
 }
