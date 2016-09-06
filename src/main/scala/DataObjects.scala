@@ -2,11 +2,11 @@ import java.sql.Timestamp
 import java.time.Instant
 
 import scala.collection.immutable.{Map, Seq, SortedSet}
+import shapeless._
+import syntax.zipper._
 import slick.jdbc.MySQLProfile.api._
 import spray.json.{DefaultJsonProtocol, JsValue, RootJsonReader}
 import Schema.Tick
-import shapeless.Generic
-import slick.jdbc.GetResult
 
 case class CSVLine(line: String)
 
@@ -109,60 +109,10 @@ case class CSVTick(id: Long, timestamp: Timestamp, currencyPair: String,
 }
 
 object CSVTick {
-  implicit val getCSVTickResult = GetResult(r => CSVTick(
-    r.nextLong, r.nextTimestamp(), r.nextString, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption, r.nextBigDecimalOption,
-    r.nextBigDecimalOption)
-  )
+  val genericTick = Generic[Tick]
+  val genericCSVTick = Generic[CSVTick]
 
-  def getAllTicks(limit: Int, offset: Int) =
-    sql"""select tick.id, tick.timestamp, tick.currency_pair, tick.open, tick.high, tick.low, tick.close, tick.volume, avg(past.volume),
-                 tick.bid_ask_midpoint, tick.bid_price_avg_1, tick.bid_price_avg_10, tick.bid_price_avg_25, tick.bid_price_avg_50,
-                 tick.bid_price_avg_100, tick.bid_price_avg_500, tick.bid_price_avg_1000, tick.bid_price_avg_2500, tick.bid_price_avg_5000,
-                 tick.bid_price_avg_10000, tick.ask_price_avg_1, tick.ask_price_avg_10, tick.ask_price_avg_25, tick.ask_price_avg_50, tick.ask_price_avg_100,
-                 tick.ask_price_avg_500, tick.ask_price_avg_1000, tick.ask_price_avg_2500, tick.ask_price_avg_5000, tick.ask_price_avg_10000,
-                 tick.bid_amount_sum_5percent, tick.bid_amount_sum_10percent, tick.bid_amount_sum_25percent, tick.bid_amount_sum_50percent,
-                 tick.bid_amount_sum_75percent, tick.bid_amount_sum_85percent, tick.bid_amount_sum_100percent,
-                 tick.ask_amount_sum_5percent, tick.ask_amount_sum_10percent, tick.ask_amount_sum_25percent, tick.ask_amount_sum_50percent,
-                 tick.ask_amount_sum_75percent, tick.ask_amount_sum_85percent, tick.ask_amount_sum_100percent, tick.ask_amount_sum_200percent,
-                 tick.loan_offer_rate_avg_1, tick.loan_offer_rate_avg_10, tick.loan_offer_rate_avg_25, tick.loan_offer_rate_avg_50, tick.loan_offer_rate_avg_100,
-                 tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
-                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
-          from ticks tick, ticks past
-          where tick.chart_data_final and past.chart_data_final and
-                past.timestamp > date_sub(tick.timestamp, interval 7 day) and
-                past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
-          group by tick.timestamp, tick.currency_pair
-          order by tick.timestamp asc, tick.currency_pair asc
-          limit $limit offset $offset""".as[CSVTick]
-
-  def getTicksForCurrency(currencyPair: String)(limit: Int, offset: Int) =
-    sql"""select tick.id, tick.timestamp, tick.currency_pair, tick.open, tick.high, tick.low, tick.close, tick.volume, avg(past.volume),
-                 tick.bid_ask_midpoint, tick.bid_price_avg_1, tick.bid_price_avg_10, tick.bid_price_avg_25, tick.bid_price_avg_50,
-                 tick.bid_price_avg_100, tick.bid_price_avg_500, tick.bid_price_avg_1000, tick.bid_price_avg_2500, tick.bid_price_avg_5000,
-                 tick.bid_price_avg_10000, tick.ask_price_avg_1, tick.ask_price_avg_10, tick.ask_price_avg_25, tick.ask_price_avg_50, tick.ask_price_avg_100,
-                 tick.ask_price_avg_500, tick.ask_price_avg_1000, tick.ask_price_avg_2500, tick.ask_price_avg_5000, tick.ask_price_avg_10000,
-                 tick.bid_amount_sum_5percent, tick.bid_amount_sum_10percent, tick.bid_amount_sum_25percent, tick.bid_amount_sum_50percent,
-                 tick.bid_amount_sum_75percent, tick.bid_amount_sum_85percent, tick.bid_amount_sum_100percent,
-                 tick.ask_amount_sum_5percent, tick.ask_amount_sum_10percent, tick.ask_amount_sum_25percent, tick.ask_amount_sum_50percent,
-                 tick.ask_amount_sum_75percent, tick.ask_amount_sum_85percent, tick.ask_amount_sum_100percent, tick.ask_amount_sum_200percent,
-                 tick.loan_offer_rate_avg_1, tick.loan_offer_rate_avg_10, tick.loan_offer_rate_avg_25, tick.loan_offer_rate_avg_50, tick.loan_offer_rate_avg_100,
-                 tick.loan_offer_rate_avg_500, tick.loan_offer_rate_avg_1000, tick.loan_offer_rate_avg_2500, tick.loan_offer_rate_avg_5000,
-                 tick.loan_offer_rate_avg_10000, tick.loan_offer_amount_sum, tick.loan_offer_amount_sum / (288 * avg(past.volume))
-          from ticks tick, ticks past
-          where tick.currency_pair = $currencyPair and tick.chart_data_final and past.chart_data_final and
-                past.timestamp > date_sub(tick.timestamp, interval 7 day) and
-                past.timestamp <= tick.timestamp and past.currency_pair = tick.currency_pair
-          group by tick.timestamp, tick.currency_pair
-          order by tick.timestamp asc, tick.currency_pair asc
-          limit $limit offset $offset""".as[CSVTick]
+  def fromTick(tick: Tick): CSVTick =
+    genericCSVTick.from(
+      genericTick.to(tick).toZipper.rightBy(8).put(None).reify :+ None)
 }

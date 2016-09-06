@@ -196,7 +196,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
           (poller ? FetchOldChartData(start, end)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
             val query = ticks
-              .filter(t => t.chartDataFinal === false && t.timestamp <= untilSqlTimestamp)
+              .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
               .sortBy(_.timestamp.asc)
               .map(t => (t.timestamp, t.currencyPair))
 

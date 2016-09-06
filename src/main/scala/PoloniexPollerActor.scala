@@ -38,7 +38,19 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   implicit val materializer = ActorMaterializer()
 
   val config = ConfigFactory.load()
-  lazy val allCurrencies = Await.result(fetchMarkets(), 10 seconds)
+  lazy val allCurrencies = {
+    val currencies = fetchMarkets().map(_.sorted)
+
+    currencies onSuccess { case cs =>
+      log.info(s"Tracking the following currencies: $cs")
+    }
+
+    currencies onFailure { case e =>
+      log.error(e, "Could not fetch Poloniex Markets")
+    }
+
+    Await.result(currencies, 10 seconds)
+  }
   val marginCurrencies = config.as[Seq[String]]("poloniex.margin-currencies")
 
   val poloniexConnectionFlow: Flow[HttpRequest, HttpResponse, Any] =
@@ -184,12 +196,16 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         .`with`(ChronoField.SECOND_OF_MINUTE, 0)
         .toEpochSecond
 
-      for {
+      val insertCandles = for {
         ts <- fetchTickers()
         obs <- fetchOrderBooks()
         los <- fetchLoanOrders()
       } yield {
         s ! InsertCandles(timestamp, ts, obs, los)
+      }
+
+      insertCandles onFailure { case e =>
+        throw e
       }
 
       after(6 minutes, using = system.scheduler)(fetchChartData(timestamp)).onComplete {

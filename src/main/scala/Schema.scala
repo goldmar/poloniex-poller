@@ -124,11 +124,9 @@ object Schema {
 
     def idx1 = index("idx1", (timestamp, currencyPair), unique = true)
 
-    def idx2 = index("idx2", timestamp)
+    def idx2 = index("idx2", (timestamp, chartDataFinal))
 
-    def idx3 = index("idx3", currencyPair)
-
-    def idx4 = index("idx4", chartDataFinal)
+    def idx3 = index("idx3", (chartDataFinal, currencyPair, timestamp))
 
     def * = {
       val tickGeneric = Generic[Tick]

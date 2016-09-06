@@ -1,5 +1,6 @@
 import java.sql.Timestamp
 import java.time._
+import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -65,31 +66,63 @@ trait Service extends JsonProtocols {
       timestamp.toInstant.atZone(ZoneOffset.UTC).format(formatter)
   }
 
-  def streamCSV(countQuery: Rep[Int], sqlAction: (Int, Int) => SqlStreamingAction[Vector[CSVTick], CSVTick, Effect],
-                dateFormat: String, fractionsAsPercent: Boolean): ToResponseMarshallable = {
+  case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
-    val limit = 100
+  def streamCSV(query: Query[Ticks, Tick, Seq],
+                dateFormat: String, fractionsAsPercent: Boolean): ToResponseMarshallable = {
 
     val headerSource = Source.single(CSVLine(csvHeader))
 
-    val countResult = DB.get.run(countQuery.result)
+    val tickPublisher = DB.get.stream(query.result.withStatementParameters(statementInit = DB.enableStream))
 
-    var tickSource = Source.fromFuture(countResult)
-      .flatMapConcat(count => Source(0 to count / limit))
-      .mapAsync(1)(i => DB.get.run(sqlAction(limit, i * limit)))
-      .mapConcat(identity)
+    val tickWithVolumeSource = Source.fromPublisher(tickPublisher)
+      .scan(Tick.empty(), false, "", BigDecimal(0), Vector.empty[TickInstantVolume]) {
+        case ((tick, complete, currencyPair, volumeSum, window), next) =>
+          val nextC = next.currencyPair
+          val nextInstant = next.timestamp.toInstant
+          val oneWeekAgo = nextInstant.minus(7, ChronoUnit.DAYS)
+          (currencyPair, window.headOption) match {
+            case (c, Some(t)) if c == nextC && t.instant.compareTo(oneWeekAgo) <= 0 =>
+              (next, true, c,
+                volumeSum - window.head.volume.getOrElse(0) + next.volume.getOrElse(0),
+                (window.tail :+ TickInstantVolume(next.timestamp.toInstant, next.volume)))
+            case (c, _) if c == nextC =>
+              (next, false, c,
+                volumeSum + next.volume.getOrElse(0),
+                (window :+ TickInstantVolume(next.timestamp.toInstant, next.volume)))
+            case _ =>
+              (next, false, nextC,
+                next.volume.getOrElse(0),
+                Vector(TickInstantVolume(next.timestamp.toInstant, next.volume)))
+          }
+      }.drop(1).map { case (tick, complete, currencyPair, sum, window) =>
+      (complete, window.length) match {
+        case (true, l) if l > 0 => (tick, Some(sum / l))
+        case _ => (tick, None)
+      }
+    }
 
-    tickSource = if (fractionsAsPercent)
-      tickSource.map(_.withFractionsAsPercent)
+    var csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
+      CSVTick.fromTick(tick).copy(
+        volumeAvgPast7Days = avgVolumeOption,
+        loanOfferAmountSumRelToVol =
+          for {
+            loanOfferAmountSum <- tick.loanOfferAmountSum
+            avgVolume <- avgVolumeOption if avgVolume > 0
+          } yield loanOfferAmountSum / avgVolume)
+    }
+
+    csvTickSource = if (fractionsAsPercent)
+      csvTickSource.map(_.withFractionsAsPercent)
     else
-      tickSource
+      csvTickSource
 
     val csvLineSource = dateFormat match {
       case "german" =>
         implicit val converter = germanTimestampConverter
-        tickSource.map(t => CSVLine(t.toCSV()))
+        csvTickSource.map(t => CSVLine(t.toCSV()))
       case _ =>
-        tickSource.map(t => CSVLine(t.toCSV()))
+        csvTickSource.map(t => CSVLine(t.toCSV()))
     }
 
     Source.combine(headerSource, csvLineSource)(Concat(_))
@@ -101,15 +134,16 @@ trait Service extends JsonProtocols {
         pathPrefix("csv") {
           pathSingleSlash {
             get {
+              complete("")
               parameters(
                 Symbol("date-format") ? "default",
                 Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
                 complete {
-                  val countQuery = ticks
-                    .filter(_.chartDataFinal)
-                    .length
+                  val query = ticks
+                    .filter(t => t.chartDataFinal === true)
+                    .sortBy(t => (t.currencyPair.asc, t.timestamp.asc))
 
-                  streamCSV(countQuery, CSVTick.getAllTicks, dateFormat, fractionsAsPercent)
+                  streamCSV(query, dateFormat, fractionsAsPercent)
                 }
               }
             }
@@ -120,11 +154,11 @@ trait Service extends JsonProtocols {
                 Symbol("date-format") ? "default",
                 Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
                 complete {
-                  val countQuery = ticks
-                    .filter(t => t.chartDataFinal && t.currencyPair === currencyPair)
-                    .length
+                  val query = ticks
+                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                    .sortBy(_.timestamp.asc)
 
-                  streamCSV(countQuery, CSVTick.getTicksForCurrency(currencyPair), dateFormat, fractionsAsPercent)
+                  streamCSV(query, dateFormat, fractionsAsPercent)
                 }
               }
             }
