@@ -55,6 +55,14 @@ trait Service extends JsonProtocols {
     keys.toList.map(_.name).mkString(",")
   }
 
+  val specialCSVHeader = {
+    import shapeless._
+    import shapeless.ops.record._
+    val label = LabelledGeneric[SpecialCSVTick]
+    val keys = Keys[label.Repr].apply
+    keys.toList.map(_.name).mkString(",")
+  }
+
   val germanTimestampConverter = new StringConverter[Timestamp] {
     val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")
 
@@ -67,10 +75,8 @@ trait Service extends JsonProtocols {
 
   case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
-  def streamCSV(query: Query[Ticks, Tick, Seq],
-                dateFormat: String, fractionsAsPercent: Boolean): ToResponseMarshallable = {
-
-    val headerSource = Source.single(CSVLine(csvHeader))
+  def streamCSV(query: Query[Ticks, Tick, Seq], dateFormat: String,
+                fractionsAsPercent: Boolean, specialOrder: Boolean): ToResponseMarshallable = {
 
     val tickPublisher = DB.get.stream(query.result.withStatementParameters(statementInit = DB.enableStream))
 
@@ -126,7 +132,23 @@ trait Service extends JsonProtocols {
         csvTickSource.map(t => CSVLine(t.toCSV()))
     }
 
-    Source.combine(headerSource, csvLineSource)(Concat(_))
+    val specialCSVLineSource = dateFormat match {
+      case "german" =>
+        implicit val converter = germanTimestampConverter
+        csvTickSource.map(t => CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
+      case _ =>
+        csvTickSource.map(t => CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
+    }
+
+    specialOrder match {
+      case true =>
+        val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
+        Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
+      case _ =>
+        val headerSource = Source.single(CSVLine(csvHeader))
+        Source.combine(headerSource, csvLineSource)(Concat(_))
+    }
+
   }
 
   val routes = {
@@ -138,13 +160,14 @@ trait Service extends JsonProtocols {
               complete("")
               parameters(
                 Symbol("date-format") ? "default",
-                Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
+                Symbol("fractions-as-percent") ? false,
+                Symbol("special-order") ? false) { (dateFormat, fractionsAsPercent, specialOrder) =>
                 complete {
                   val query = ticks
                     .filter(t => t.chartDataFinal === true)
                     .sortBy(t => (t.currencyPair.asc, t.timestamp.asc))
 
-                  streamCSV(query, dateFormat, fractionsAsPercent)
+                  streamCSV(query, dateFormat, fractionsAsPercent, specialOrder)
                 }
               }
             }
@@ -153,13 +176,14 @@ trait Service extends JsonProtocols {
               get {
                 parameters(
                   Symbol("date-format") ? "default",
-                  Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
+                  Symbol("fractions-as-percent") ? false,
+                  Symbol("special-order") ? false) { (dateFormat, fractionsAsPercent, specialOrder) =>
                   complete {
                     val query = ticks
                       .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
                       .sortBy(_.timestamp.asc)
 
-                    streamCSV(query, dateFormat, fractionsAsPercent)
+                    streamCSV(query, dateFormat, fractionsAsPercent, specialOrder)
                   }
                 }
               }

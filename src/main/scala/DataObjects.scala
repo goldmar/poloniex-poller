@@ -1,8 +1,6 @@
 import java.sql.Timestamp
 
 import scala.collection.immutable.{Map, Seq, SortedSet}
-import shapeless._
-import syntax.zipper._
 import spray.json.{DefaultJsonProtocol, JsValue, RootJsonReader}
 import Schema.Tick
 
@@ -107,10 +105,98 @@ case class CSVTick(timestamp: Timestamp, currencyPair: String,
 }
 
 object CSVTick {
-  val genericTick = Generic[Tick]
-  val genericCSVTick = Generic[CSVTick]
-
   def fromTick(tick: Tick): CSVTick =
-    genericCSVTick.from(
-      genericTick.to(tick).toZipper.delete.rightBy(7).put(None).reify :+ None)
+    CSVTick(timestamp = tick.timestamp, currencyPair = tick.currencyPair,
+      open = tick.open, high = tick.high,
+      low = tick.low, close = tick.close,
+      volume = tick.volume, volumeAvgPast7Days = None,
+      bidAskMidpoint = tick.bidAskMidpoint,
+      bidPriceAvg1 = tick.bidPriceAvg1, bidPriceAvg10 = tick.bidPriceAvg10,
+      bidPriceAvg25 = tick.bidPriceAvg25, bidPriceAvg50 = tick.bidPriceAvg50,
+      bidPriceAvg100 = tick.bidPriceAvg100, bidPriceAvg500 = tick.bidPriceAvg500,
+      bidPriceAvg1000 = tick.bidPriceAvg1000, bidPriceAvg2500 = tick.bidPriceAvg2500,
+      bidPriceAvg5000 = tick.bidPriceAvg5000, bidPriceAvg10000 = tick.bidPriceAvg10000,
+      askPriceAvg1 = tick.askPriceAvg1, askPriceAvg10 = tick.askPriceAvg10,
+      askPriceAvg25 = tick.askPriceAvg25, askPriceAvg50 = tick.askPriceAvg50,
+      askPriceAvg100 = tick.askPriceAvg100, askPriceAvg500 = tick.askPriceAvg500,
+      askPriceAvg1000 = tick.askPriceAvg1000, askPriceAvg2500 = tick.askPriceAvg2500,
+      askPriceAvg5000 = tick.askPriceAvg5000, askPriceAvg10000 = tick.askPriceAvg10000,
+      bidAmountSum5percent = tick.bidAmountSum5percent, bidAmountSum10percent = tick.bidAmountSum10percent,
+      bidAmountSum25percent = tick.bidAmountSum25percent, bidAmountSum50percent = tick.bidAmountSum50percent,
+      bidAmountSum75percent = tick.bidAmountSum75percent, bidAmountSum85percent = tick.bidAmountSum85percent,
+      bidAmountSum100percent = tick.bidAmountSum100percent, askAmountSum5percent = tick.askAmountSum5percent,
+      askAmountSum10percent = tick.askAmountSum10percent, askAmountSum25percent = tick.askAmountSum25percent,
+      askAmountSum50percent = tick.askAmountSum50percent, askAmountSum75percent = tick.askAmountSum75percent,
+      askAmountSum85percent = tick.askAmountSum85percent, askAmountSum100percent = tick.askAmountSum100percent,
+      askAmountSum200percent = tick.askAmountSum200percent,
+      loanOfferRateAvg1 = tick.loanOfferRateAvg1, loanOfferRateAvg10 = tick.loanOfferRateAvg10,
+      loanOfferRateAvg25 = tick.loanOfferRateAvg25, loanOfferRateAvg50 = tick.loanOfferRateAvg50,
+      loanOfferRateAvg100 = tick.loanOfferRateAvg100, loanOfferRateAvg500 = tick.loanOfferRateAvg500,
+      loanOfferRateAvg1000 = tick.loanOfferRateAvg1000, loanOfferRateAvg2500 = tick.loanOfferRateAvg2500,
+      loanOfferRateAvg5000 = tick.loanOfferRateAvg5000, loanOfferRateAvg10000 = tick.loanOfferRateAvg10000,
+      loanOfferAmountSum = tick.loanOfferAmountSum, loanOfferAmountSumRelToVol = None)
+}
+
+case class SpecialCSVTick(datum: Timestamp,
+                          open: Option[BigDecimal], high: Option[BigDecimal],
+                          low: Option[BigDecimal], close: Option[BigDecimal],
+                          volume: Option[BigDecimal], volumeAvgPast7Days: Option[BigDecimal],
+                          bidAskMidpoint: Option[BigDecimal],
+                          bidPriceAvg1: Option[BigDecimal],
+                          currencyPair: String, bidPriceAvg10: Option[BigDecimal],
+                          bidPriceAvg25: Option[BigDecimal], bidPriceAvg50: Option[BigDecimal],
+                          bidPriceAvg100: Option[BigDecimal], bidPriceAvg500: Option[BigDecimal],
+                          bidPriceAvg1000: Option[BigDecimal], bidPriceAvg2500: Option[BigDecimal],
+                          bidPriceAvg5000: Option[BigDecimal], bidPriceAvg10000: Option[BigDecimal],
+                          askPriceAvg1: Option[BigDecimal], askPriceAvg10: Option[BigDecimal],
+                          askPriceAvg25: Option[BigDecimal], askPriceAvg50: Option[BigDecimal],
+                          askPriceAvg100: Option[BigDecimal], askPriceAvg500: Option[BigDecimal],
+                          askPriceAvg1000: Option[BigDecimal], askPriceAvg2500: Option[BigDecimal],
+                          askPriceAvg5000: Option[BigDecimal], askPriceAvg10000: Option[BigDecimal],
+                          bidAmountSum5percent: Option[BigDecimal], bidAmountSum10percent: Option[BigDecimal],
+                          bidAmountSum25percent: Option[BigDecimal], bidAmountSum50percent: Option[BigDecimal],
+                          bidAmountSum75percent: Option[BigDecimal], bidAmountSum85percent: Option[BigDecimal],
+                          bidAmountSum100percent: Option[BigDecimal], askAmountSum5percent: Option[BigDecimal],
+                          askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
+                          askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
+                          askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
+                          askAmountSum200percent: Option[BigDecimal],
+                          loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg10: Option[BigDecimal],
+                          loanOfferRateAvg25: Option[BigDecimal], loanOfferRateAvg50: Option[BigDecimal],
+                          loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
+                          loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
+                          loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
+                          loanOfferAmountSum: Option[BigDecimal], loanOfferAmountSumRelToVol: Option[BigDecimal])
+
+object SpecialCSVTick {
+  def fromTick(csvTick: CSVTick): SpecialCSVTick =
+    SpecialCSVTick(datum = csvTick.timestamp, currencyPair = csvTick.currencyPair,
+      open = csvTick.open, high = csvTick.high,
+      low = csvTick.low, close = csvTick.close,
+      volume = csvTick.volume, volumeAvgPast7Days = None,
+      bidAskMidpoint = csvTick.bidAskMidpoint,
+      bidPriceAvg1 = csvTick.bidPriceAvg1, bidPriceAvg10 = csvTick.bidPriceAvg10,
+      bidPriceAvg25 = csvTick.bidPriceAvg25, bidPriceAvg50 = csvTick.bidPriceAvg50,
+      bidPriceAvg100 = csvTick.bidPriceAvg100, bidPriceAvg500 = csvTick.bidPriceAvg500,
+      bidPriceAvg1000 = csvTick.bidPriceAvg1000, bidPriceAvg2500 = csvTick.bidPriceAvg2500,
+      bidPriceAvg5000 = csvTick.bidPriceAvg5000, bidPriceAvg10000 = csvTick.bidPriceAvg10000,
+      askPriceAvg1 = csvTick.askPriceAvg1, askPriceAvg10 = csvTick.askPriceAvg10,
+      askPriceAvg25 = csvTick.askPriceAvg25, askPriceAvg50 = csvTick.askPriceAvg50,
+      askPriceAvg100 = csvTick.askPriceAvg100, askPriceAvg500 = csvTick.askPriceAvg500,
+      askPriceAvg1000 = csvTick.askPriceAvg1000, askPriceAvg2500 = csvTick.askPriceAvg2500,
+      askPriceAvg5000 = csvTick.askPriceAvg5000, askPriceAvg10000 = csvTick.askPriceAvg10000,
+      bidAmountSum5percent = csvTick.bidAmountSum5percent, bidAmountSum10percent = csvTick.bidAmountSum10percent,
+      bidAmountSum25percent = csvTick.bidAmountSum25percent, bidAmountSum50percent = csvTick.bidAmountSum50percent,
+      bidAmountSum75percent = csvTick.bidAmountSum75percent, bidAmountSum85percent = csvTick.bidAmountSum85percent,
+      bidAmountSum100percent = csvTick.bidAmountSum100percent, askAmountSum5percent = csvTick.askAmountSum5percent,
+      askAmountSum10percent = csvTick.askAmountSum10percent, askAmountSum25percent = csvTick.askAmountSum25percent,
+      askAmountSum50percent = csvTick.askAmountSum50percent, askAmountSum75percent = csvTick.askAmountSum75percent,
+      askAmountSum85percent = csvTick.askAmountSum85percent, askAmountSum100percent = csvTick.askAmountSum100percent,
+      askAmountSum200percent = csvTick.askAmountSum200percent,
+      loanOfferRateAvg1 = csvTick.loanOfferRateAvg1, loanOfferRateAvg10 = csvTick.loanOfferRateAvg10,
+      loanOfferRateAvg25 = csvTick.loanOfferRateAvg25, loanOfferRateAvg50 = csvTick.loanOfferRateAvg50,
+      loanOfferRateAvg100 = csvTick.loanOfferRateAvg100, loanOfferRateAvg500 = csvTick.loanOfferRateAvg500,
+      loanOfferRateAvg1000 = csvTick.loanOfferRateAvg1000, loanOfferRateAvg2500 = csvTick.loanOfferRateAvg2500,
+      loanOfferRateAvg5000 = csvTick.loanOfferRateAvg5000, loanOfferRateAvg10000 = csvTick.loanOfferRateAvg10000,
+      loanOfferAmountSum = csvTick.loanOfferAmountSum, loanOfferAmountSumRelToVol = None)
 }
