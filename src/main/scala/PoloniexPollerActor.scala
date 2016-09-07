@@ -218,7 +218,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
           }
           s ! UpsertCandleChartData(timestamp, candleOptions)
         case Failure(e) =>
-          log.error(e, "Poloniex Chart Data Update failed")
+          log.error(e, "Poloniex chart data update failed")
       }
 
     case FetchOldChartData(start, end) =>

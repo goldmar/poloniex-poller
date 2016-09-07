@@ -182,7 +182,7 @@ object Schema {
 
   object Tick {
     def empty() = Tick(
-      -1, Timestamp.from(Instant.now), "", None, None, None, None, None, false,
+      -1, Timestamp.from(Instant.EPOCH), "", None, None, None, None, None, false,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,

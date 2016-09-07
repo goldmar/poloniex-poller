@@ -1,10 +1,8 @@
 import java.sql.Timestamp
-import java.time.Instant
 
 import scala.collection.immutable.{Map, Seq, SortedSet}
 import shapeless._
 import syntax.zipper._
-import slick.jdbc.MySQLProfile.api._
 import spray.json.{DefaultJsonProtocol, JsValue, RootJsonReader}
 import Schema.Tick
 

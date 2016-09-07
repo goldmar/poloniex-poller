@@ -22,7 +22,6 @@ import purecsv.safe._
 import purecsv.safe.converter.StringConverter
 import CSVStringConverters._
 import Schema._
-import CSVTick._
 
 import scala.util.Try
 
@@ -43,7 +42,7 @@ trait Service extends JsonProtocols {
         complete(BadRequest -> msg)
     }
 
-  implicit def csvMarshaller =
+  implicit def csvMarshaller: Marshaller[Source[CSVLine, NotUsed], HttpEntity.Chunked] =
     Marshaller.withFixedContentType(ContentTypes.`text/csv(UTF-8)`) { source: Source[CSVLine, NotUsed] =>
       HttpEntity.Chunked.fromData(ContentTypes.`text/csv(UTF-8)`, source.map(l => ByteString(l.line + "\n")))
     }
