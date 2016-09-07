@@ -100,8 +100,8 @@ trait Service extends JsonProtocols {
         case (true, l) if l > 0 => (tick, Some(sum / l))
         case _ => (tick, None)
       }
-    }.dropWhile { case (tick, _) =>
-        tick.bidAskMidpoint.isEmpty
+    }.filter { case (tick, _) =>
+      tick.bidAskMidpoint.nonEmpty
     }
 
     var csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
@@ -150,21 +150,21 @@ trait Service extends JsonProtocols {
               }
             }
           } ~
-          path(Segment) { currencyPair =>
-            get {
-              parameters(
-                Symbol("date-format") ? "default",
-                Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
-                complete {
-                  val query = ticks
-                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
-                    .sortBy(_.timestamp.asc)
+            path(Segment) { currencyPair =>
+              get {
+                parameters(
+                  Symbol("date-format") ? "default",
+                  Symbol("fractions-as-percent") ? false) { (dateFormat, fractionsAsPercent) =>
+                  complete {
+                    val query = ticks
+                      .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                      .sortBy(_.timestamp.asc)
 
-                  streamCSV(query, dateFormat, fractionsAsPercent)
+                    streamCSV(query, dateFormat, fractionsAsPercent)
+                  }
                 }
               }
             }
-          }
         }
       }
     }
