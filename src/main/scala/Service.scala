@@ -75,78 +75,61 @@ trait Service extends JsonProtocols {
 
   case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
-  def streamCSV(query: Query[Ticks, Tick, Seq], dateFormat: String,
-                fractionsAsPercent: Boolean, specialOrder: Boolean): ToResponseMarshallable = {
-
-    val tickPublisher = DB.get.stream(query.result.withStatementParameters(statementInit = DB.enableStream))
+  def streamCSV(query: Query[Ticks, Tick, Seq], special: Boolean): ToResponseMarshallable = {
+    val tickPublisher = DB.get.stream(
+      query.result.withStatementParameters(statementInit = DB.enableStream))
 
     val tickWithVolumeSource = Source.fromPublisher(tickPublisher)
       .scan(Tick.empty(), false, "", BigDecimal(0), Vector.empty[TickInstantVolume]) {
         case ((tick, weekIsFull, currencyPair, volumeSum, window), next) =>
           val nextC = next.currencyPair
           val nextInstant = next.timestamp.toInstant
+          val nextVolume = next.volume
           val oneWeekAgo = nextInstant.minus(7, ChronoUnit.DAYS)
           (currencyPair, window.headOption) match {
             case (c, Some(t)) if c == nextC && t.instant.compareTo(oneWeekAgo) <= 0 =>
               (next, true, c,
-                volumeSum - window.head.volume.getOrElse(0) + next.volume.getOrElse(0),
-                (window.tail :+ TickInstantVolume(next.timestamp.toInstant, next.volume)))
+                volumeSum - window.head.volume.getOrElse(0) + nextVolume.getOrElse(0),
+                (window.tail :+ TickInstantVolume(nextInstant, nextVolume)))
             case (c, _) if c == nextC =>
               (next, false, c,
-                volumeSum + next.volume.getOrElse(0),
-                (window :+ TickInstantVolume(next.timestamp.toInstant, next.volume)))
+                volumeSum + nextVolume.getOrElse(0),
+                (window :+ TickInstantVolume(nextInstant, nextVolume)))
             case _ =>
               (next, false, nextC,
-                next.volume.getOrElse(0),
-                Vector(TickInstantVolume(next.timestamp.toInstant, next.volume)))
+                nextVolume.getOrElse(0),
+                Vector(TickInstantVolume(nextInstant, nextVolume)))
           }
-      }.drop(1).map { case (tick, weekIsFull, currencyPair, sum, window) =>
+      }.drop(1).map { case (tick, weekIsFull, currencyPair, volumeSum, window) =>
       (weekIsFull, window.flatMap(_.volume).length) match {
-        case (true, l) if l > 0 => (tick, Some(sum / l))
+        case (true, l) if l > 0 => (tick, Some(volumeSum / l))
         case _ => (tick, None)
       }
     }.filter { case (tick, _) =>
       tick.bidAskMidpoint.nonEmpty
     }
 
-    var csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
+    val csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
       CSVTick.fromTick(tick).copy(
         volumeAvgPast7Days = avgVolumeOption,
-        loanOfferAmountSumRelToVol =
+        loanOfferAmountSumRelToAvgVol =
           for {
             loanOfferAmountSum <- tick.loanOfferAmountSum
             avgVolume <- avgVolumeOption if avgVolume > 0
           } yield loanOfferAmountSum / avgVolume)
     }
 
-    csvTickSource = if (fractionsAsPercent)
-      csvTickSource.map(_.withFractionsAsPercent)
-    else
-      csvTickSource
-
-    val csvLineSource = dateFormat match {
-      case "german" =>
-        implicit val converter = germanTimestampConverter
-        csvTickSource.map(t => CSVLine(t.toCSV()))
-      case _ =>
-        csvTickSource.map(t => CSVLine(t.toCSV()))
-    }
-
-    val specialCSVLineSource = dateFormat match {
-      case "german" =>
-        implicit val converter = germanTimestampConverter
-        csvTickSource.map(t => CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
-      case _ =>
-        csvTickSource.map(t => CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
-    }
-
-    specialOrder match {
-      case true =>
-        val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
-        Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
-      case _ =>
+    special match {
+      case false =>
         val headerSource = Source.single(CSVLine(csvHeader))
+        val csvLineSource = csvTickSource.map(t => CSVLine(t.toCSV()))
         Source.combine(headerSource, csvLineSource)(Concat(_))
+      case true =>
+        implicit val converter = germanTimestampConverter
+        val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
+        val specialCSVLineSource = csvTickSource.map(t =>
+          CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
+        Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
     }
 
   }
@@ -159,35 +142,31 @@ trait Service extends JsonProtocols {
             get {
               complete("")
               parameters(
-                Symbol("date-format") ? "default",
-                Symbol("fractions-as-percent") ? false,
-                Symbol("special-order") ? false) { (dateFormat, fractionsAsPercent, specialOrder) =>
+                Symbol("special") ? false) { special =>
                 complete {
                   val query = ticks
                     .filter(t => t.chartDataFinal === true)
                     .sortBy(t => (t.currencyPair.asc, t.timestamp.asc))
 
-                  streamCSV(query, dateFormat, fractionsAsPercent, specialOrder)
+                  streamCSV(query, special)
                 }
               }
             }
           } ~
-            path(Segment) { currencyPair =>
-              get {
-                parameters(
-                  Symbol("date-format") ? "default",
-                  Symbol("fractions-as-percent") ? false,
-                  Symbol("special-order") ? false) { (dateFormat, fractionsAsPercent, specialOrder) =>
-                  complete {
-                    val query = ticks
-                      .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
-                      .sortBy(_.timestamp.asc)
+          path(Segment) { currencyPair =>
+            get {
+              parameters(
+                Symbol("special") ? false) { special =>
+                complete {
+                  val query = ticks
+                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                    .sortBy(_.timestamp.asc)
 
-                    streamCSV(query, dateFormat, fractionsAsPercent, specialOrder)
-                  }
+                  streamCSV(query, special)
                 }
               }
             }
+          }
         }
       }
     }

@@ -39,7 +39,8 @@ object Main extends App with Service {
   val oneWeekAgo = now.minus(7, ChronoUnit.DAYS)
 
   val poloniexDataSaver = system.actorOf(Props[PoloniexDataSaverActor])
-  system.scheduler.scheduleOnce(6 minutes, poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
+  system.scheduler.scheduleOnce(config.as[Int]("poloniex.update-delay-in-minutes") minutes,
+    poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
 
   scheduler.schedule("Every5Minutes", poloniexDataSaver, Poll)
 

@@ -208,7 +208,10 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         throw e
       }
 
-      after(6 minutes, using = system.scheduler)(fetchChartData(timestamp)).onComplete {
+      after(
+        config.as[Int]("poloniex.update-delay-in-minutes") minutes,
+        using = system.scheduler)(fetchChartData(timestamp)
+      ).onComplete {
         case Success(cds) =>
           val candleOptions = cds.map { case (c, candleSeq) =>
             c -> candleSeq.head

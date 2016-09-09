@@ -146,7 +146,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       val updates = cds.map { case (c, cdcOption) =>
         for {
           rowsAffected <- ticks
-            .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c)
+            .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
             .map(t =>
               (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
             .update(
