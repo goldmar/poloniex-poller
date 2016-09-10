@@ -90,11 +90,11 @@ trait Service extends JsonProtocols {
             case (c, Some(t)) if c == nextC && t.instant.compareTo(oneWeekAgo) <= 0 =>
               (next, true, c,
                 volumeSum - window.head.volume.getOrElse(0) + nextVolume.getOrElse(0),
-                (window.tail :+ TickInstantVolume(nextInstant, nextVolume)))
+                window.tail :+ TickInstantVolume(nextInstant, nextVolume))
             case (c, _) if c == nextC =>
               (next, false, c,
                 volumeSum + nextVolume.getOrElse(0),
-                (window :+ TickInstantVolume(nextInstant, nextVolume)))
+                window :+ TickInstantVolume(nextInstant, nextVolume))
             case _ =>
               (next, false, nextC,
                 nextVolume.getOrElse(0),
@@ -127,8 +127,15 @@ trait Service extends JsonProtocols {
       case true =>
         implicit val converter = germanTimestampConverter
         val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
-        val specialCSVLineSource = csvTickSource.map(t =>
-          CSVLine(SpecialCSVTick.fromTick(t).toCSV()))
+        val specialCSVLineSource = csvTickSource.map(tick =>
+          tick match {
+            case t if t.volume.getOrElse(BigDecimal(0)) > 0 =>
+              CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
+            case t =>
+              CSVLine(SpecialCSVTick.fromTick(tick.copy(
+                open = None, high = None, low = None, close = None
+              )).toCSV())
+          })
         Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
     }
 

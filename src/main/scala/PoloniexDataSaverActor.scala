@@ -141,35 +141,53 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       }
 
     case UpsertCandleChartData(timestamp, cds) =>
-      val sqlTimestamp = Timestamp.from(Instant.ofEpochSecond(timestamp))
+      val instant = Instant.ofEpochSecond(timestamp)
+      val sqlTimestamp = Timestamp.from(instant)
+      val sqlTimstamp5MinAgo = Timestamp.from(instant.minus(5, ChronoUnit.MINUTES))
 
-      val updates = cds.map { case (c, cdcOption) =>
-        for {
-          rowsAffected <- ticks
-            .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
-            .map(t =>
-              (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
-            .update(
-              cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
-              cdcOption.map(_.close), cdcOption.map(_.volume), true)
-          result <- rowsAffected match {
-            case 0 => ticks += Tick.empty().copy(
-              timestamp = sqlTimestamp,
-              currencyPair = c,
-              open = cdcOption.map(_.open),
-              high = cdcOption.map(_.high),
-              low = cdcOption.map(_.low),
-              close = cdcOption.map(_.close),
-              volume = cdcOption.map(_.volume),
-              chartDataFinal = true)
-            case 1 => DBIO.successful(1)
-            case n => DBIO.failed(new RuntimeException(
-              s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
-          }
-        } yield result
-      }
+      val updatesFuture = Future.sequence(cds.map { case (c, cdcOption) =>
+        (cdcOption match {
+          case Some(candle) =>
+            Future(Some(candle))
+          case None =>
+            DB.get.run(
+              ticks.filter(t =>
+                t.timestamp === sqlTimstamp5MinAgo && t.currencyPair === c &&
+                  t.chartDataFinal === true).result.headOption
+            ).map(_.map { t =>
+              val previousClose = t.close.get
+              ChartDataCandle(timestamp, previousClose, previousClose, previousClose, previousClose, 0)
+            })
+        }).map { cdcOption =>
 
-      val result = DB.get.run(DBIO.seq(updates.toSeq: _*))
+          for {
+            rowsAffected <- ticks
+              .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
+              .map(t =>
+                (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
+              .update(
+                cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
+                cdcOption.map(_.close), cdcOption.map(_.volume), true)
+            result <- rowsAffected match {
+              case 0 => ticks += Tick.empty().copy(
+                timestamp = sqlTimestamp,
+                currencyPair = c,
+                open = cdcOption.map(_.open),
+                high = cdcOption.map(_.high),
+                low = cdcOption.map(_.low),
+                close = cdcOption.map(_.close),
+                volume = cdcOption.map(_.volume),
+                chartDataFinal = true)
+              case 1 => DBIO.successful(1)
+              case n => DBIO.failed(new RuntimeException(
+                s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
+            }
+          } yield result
+        }
+      })
+
+      val result = updatesFuture.map(updates =>
+        DB.get.run(DBIO.seq(updates.toSeq: _*)))
 
       result onSuccess { case _ =>
         log.info(s"Upserted candles at timestamp $timestamp")
@@ -200,8 +218,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               .sortBy(_.timestamp.asc)
               .map(t => (t.timestamp, t.currencyPair))
 
-            DB.get.run(query.result).foreach { case r =>
-              val tuples = r map { case (sqlTimestamp, c) =>
+            DB.get.run(query.result).foreach { r =>
+              val tuples = r.map { case (sqlTimestamp, c) =>
                 val timestamp = sqlTimestamp.toInstant.getEpochSecond
                 cds.get(timestamp).flatMap(_.get(c)) match {
                   case Some(candle) =>
@@ -212,8 +230,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               }
 
               val candles = tuples.groupBy(_._1).map { case (t, tuple) =>
-                t -> tuple.groupBy(_._2).map { case (c, tuple) =>
-                  c -> tuple.head._3
+                t -> tuple.groupBy(_._2).map { case (c, subTuple) =>
+                  c -> subTuple.head._3
                 }
               }
 
@@ -229,7 +247,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
     case RequestInsertOldCandles(fromOption, until) =>
       val fromFuture = fromOption match {
-        case Some(from) => Future(from)
+        case Some(from) =>
+          Future(from)
 
         case None =>
           val query = ticks
@@ -237,12 +256,11 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
             .map(_.timestamp)
             .take(1)
 
-          DB.get.run(query.result.head).map { case timestamp =>
-            timestamp.toInstant.plus(5, ChronoUnit.MINUTES).getEpochSecond
-          }
+          DB.get.run(query.result.head).map(timestamp =>
+            timestamp.toInstant.plus(5, ChronoUnit.MINUTES).getEpochSecond)
       }
 
-      fromFuture.foreach { case from =>
+      fromFuture.foreach { from =>
         (poller ? FetchOldChartData(from, until)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
           for (t <- cds.keys.toSeq.sorted if t >= from && t <= until) {
             self ! UpsertCandleChartData(t, cds(t).map { case (c, cdc) => c -> Some(cdc) })
