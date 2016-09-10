@@ -39,8 +39,6 @@ object Main extends App with Service {
   val oneWeekAgo = now.minus(7, ChronoUnit.DAYS)
 
   val poloniexDataSaver = system.actorOf(Props[PoloniexDataSaverActor])
-  system.scheduler.scheduleOnce(config.as[Int]("poloniex.update-delay-in-minutes") minutes,
-    poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
 
   scheduler.schedule("Every5Minutes", poloniexDataSaver, Poll)
 
@@ -50,7 +48,11 @@ object Main extends App with Service {
     if (tables.contains(ticks.baseTableRow.tableName)) {
       log.info("Table ticks already exists")
       log.info("Filling in missing chart data")
+      val updateDelay = config.as[Int]("poloniex.update-delay-in-minutes")
+      poloniexDataSaver ! RequestUpdateOldCandles(now.minus(updateDelay, ChronoUnit.MINUTES).getEpochSecond)
       poloniexDataSaver ! RequestInsertOldCandles(None, now.getEpochSecond)
+      system.scheduler.scheduleOnce(updateDelay minutes,
+        poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
     } else {
       val result = DB.get.run(DBIO.seq(
         ticks.schema.create

@@ -32,6 +32,8 @@ case class UpsertCandleChartData(timestamp: Long, cds: Map[String, Option[ChartD
 
 case class OldCandleChartData(cds: Map[Long, Map[String, ChartDataCandle]])
 
+case object ListAllCurrencies
+
 class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
@@ -187,7 +189,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
 
   override def receive = {
     case Poll =>
-      val s = sender()
+      val s = sender
 
       val now = ZonedDateTime.now(ZoneOffset.UTC)
       val rem = now.get(ChronoField.MINUTE_OF_HOUR) % 5
@@ -225,9 +227,12 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
       }
 
     case FetchOldChartData(start, end) =>
-      val s = sender()
+      val s = sender
       fetchChartDataAsNestedMap(start, end).map { cds =>
         OldCandleChartData(cds)
       } pipeTo s
+
+    case ListAllCurrencies =>
+      sender ! allCurrencies
   }
 }

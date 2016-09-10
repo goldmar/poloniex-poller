@@ -154,12 +154,11 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               ticks.filter(t =>
                 t.timestamp === sqlTimstamp5MinAgo && t.currencyPair === c &&
                   t.chartDataFinal === true).result.headOption
-            ).map(_.map { t =>
-              val previousClose = t.close.get
-              ChartDataCandle(timestamp, previousClose, previousClose, previousClose, previousClose, 0)
-            })
+            ).map(tickOption =>
+              tickOption.flatMap(tick =>
+                tick.close.map(previousClose =>
+                  ChartDataCandle(timestamp, previousClose, previousClose, previousClose, previousClose, 0))))
         }).map { cdcOption =>
-
           for {
             rowsAffected <- ticks
               .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
@@ -167,7 +166,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
                 (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
               .update(
                 cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
-                cdcOption.map(_.close), cdcOption.map(_.volume), true)
+                cdcOption.map(_.close), cdcOption.map(_.volume), cdcOption.map(_ => true).getOrElse(false))
             result <- rowsAffected match {
               case 0 => ticks += Tick.empty().copy(
                 timestamp = sqlTimestamp,
@@ -177,7 +176,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
                 low = cdcOption.map(_.low),
                 close = cdcOption.map(_.close),
                 volume = cdcOption.map(_.volume),
-                chartDataFinal = true)
+                chartDataFinal = cdcOption.map(_ => true).getOrElse(false))
               case 1 => DBIO.successful(1)
               case n => DBIO.failed(new RuntimeException(
                 s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
@@ -229,9 +228,9 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
                 }
               }
 
-              val candles = tuples.groupBy(_._1).map { case (t, tuple) =>
-                t -> tuple.groupBy(_._2).map { case (c, subTuple) =>
-                  c -> subTuple.head._3
+              val candles = tuples.groupBy(_._1).map { case (t, subTuple) =>
+                t -> subTuple.groupBy(_._2).map { case (c, subSubTuple) =>
+                  c -> subSubTuple.head._3
                 }
               }
 
@@ -261,13 +260,17 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       }
 
       fromFuture.foreach { from =>
-        (poller ? FetchOldChartData(from, until)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
+        val allCurrencies = (poller ? ListAllCurrencies).mapTo[Seq[String]]
+        val oldChartData = (poller ? FetchOldChartData(from, until)).mapTo[OldCandleChartData]
+        for {
+          allCs <- allCurrencies
+          ocd <- oldChartData
+        } yield {
+          val cds = ocd.cds
           for (t <- cds.keys.toSeq.sorted if t >= from && t <= until) {
-            self ! UpsertCandleChartData(t, cds(t).map { case (c, cdc) => c -> Some(cdc) })
+            self ! UpsertCandleChartData(t, allCs.map(c => c -> cds(t).get(c)).toMap)
           }
         }
       }
   }
 }
-
-
