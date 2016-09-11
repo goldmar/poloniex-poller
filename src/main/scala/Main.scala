@@ -84,8 +84,9 @@ object DB {
     */
   def enableStream(statement: java.sql.Statement): Unit = {
     statement match {
-      case s: com.mysql.jdbc.StatementImpl => s.enableStreamingResults()
-      case _ =>
+      case s if s.isWrapperFor(classOf[com.mysql.jdbc.StatementImpl]) =>
+        s.unwrap(classOf[com.mysql.jdbc.StatementImpl]).enableStreamingResults()
+      case _ => // do nothing
     }
   }
 }
