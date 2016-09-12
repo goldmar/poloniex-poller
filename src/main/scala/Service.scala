@@ -17,7 +17,6 @@ import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import com.typesafe.config.Config
 import purecsv.safe._
 import purecsv.safe.converter.StringConverter
 import CSVStringConverters._
@@ -31,8 +30,6 @@ trait Service extends JsonProtocols {
   implicit def executor: ExecutionContextExecutor
 
   implicit val materializer: Materializer
-
-  def config: Config
 
   val log: LoggingAdapter
 
@@ -127,15 +124,14 @@ trait Service extends JsonProtocols {
       case true =>
         implicit val converter = germanTimestampConverter
         val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
-        val specialCSVLineSource = csvTickSource.map(tick =>
-          tick match {
-            case t if t.volume.getOrElse(BigDecimal(0)) > 0 =>
-              CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
-            case t =>
-              CSVLine(SpecialCSVTick.fromTick(tick.copy(
-                open = None, high = None, low = None, close = None
-              )).toCSV())
-          })
+        val specialCSVLineSource = csvTickSource.map {
+          case tick@t if t.volume.getOrElse(BigDecimal(0)) > 0 =>
+            CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
+          case tick@t =>
+            CSVLine(SpecialCSVTick.fromTick(tick.copy(
+              open = None, high = None, low = None, close = None
+            )).toCSV())
+        }
         Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
     }
 

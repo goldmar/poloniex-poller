@@ -23,6 +23,10 @@ import sext._
 
 case object Poll
 
+case object UpdateCurrencyList
+
+case class UpdatedCurrencyList(cs: Seq[String])
+
 case class FetchOldChartData(start: Long, end: Long)
 
 case class InsertCandles(timestamp: Long, t: Map[String, BigDecimal],
@@ -39,21 +43,9 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   implicit val dispatcher = context.dispatcher
   implicit val materializer = ActorMaterializer()
 
-  val config = ConfigFactory.load()
-  lazy val allCurrencies = {
-    val currencies = fetchMarkets().map(_.sorted)
+  var allCurrencies = Seq.empty[String]
 
-    currencies onSuccess { case cs =>
-      log.info(s"Tracking the following currencies: $cs")
-    }
-
-    currencies onFailure { case e =>
-      log.error(e, "Could not fetch Poloniex Markets")
-    }
-
-    Await.result(currencies, 10 seconds)
-  }
-  val marginCurrencies = config.as[Seq[String]]("poloniex.margin-currencies")
+  self ! UpdateCurrencyList
 
   val poloniexConnectionFlow: Flow[HttpRequest, HttpResponse, Any] =
     Http().outgoingConnectionHttps("poloniex.com")
@@ -159,7 +151,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         i.rangeMax))
     }
 
-    val requests = for (c <- marginCurrencies) yield
+    val requests = for (c <- Config.marginCurrencies) yield
       poloniexRequest(RequestBuilding.Get(
         s"/public?command=returnLoanOrders&currency=$c&limit=999999")
       ).map(s"BTC_$c" -> _)
@@ -188,6 +180,23 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   }
 
   override def receive = {
+    case UpdateCurrencyList =>
+      val currencies = fetchMarkets().map(_.sorted)
+
+      currencies onSuccess { case cs =>
+        if (allCurrencies.toSet != cs.toSet) {
+          self ! UpdatedCurrencyList(cs)
+        }
+      }
+
+      currencies onFailure { case e =>
+        log.error(e, "Could not fetch Poloniex markets")
+      }
+
+    case UpdatedCurrencyList(cs) =>
+      allCurrencies = cs
+      log.info(s"Updated list of tracked currencies: $cs")
+
     case Poll =>
       val s = sender
 
@@ -211,7 +220,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
       }
 
       after(
-        config.as[Int]("poloniex.update-delay-in-minutes") minutes,
+        Config.updateDelay minutes,
         using = system.scheduler)(fetchChartData(timestamp)
       ).onComplete {
         case Success(cds) =>

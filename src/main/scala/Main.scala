@@ -22,7 +22,6 @@ object Main extends App with Service {
   override implicit val system = ActorSystem()
   override implicit val executor = system.dispatcher
 
-  override val config = ConfigFactory.load()
   override val log = Logging(system, getClass)
 
   val decider: Supervision.Decider = { e =>
@@ -35,12 +34,14 @@ object Main extends App with Service {
 
   val scheduler = QuartzSchedulerExtension(system)
 
-  val now = Instant.now
-  val oneWeekAgo = now.minus(7, ChronoUnit.DAYS)
-
   val poloniexDataSaver = system.actorOf(Props[PoloniexDataSaverActor])
 
-  scheduler.schedule("Every5Minutes", poloniexDataSaver, Poll)
+  scheduler.schedule("PollEvery5Minutes", poloniexDataSaver, Poll)
+  scheduler.schedule("UpdateCurrenciesEveryHour", poloniexDataSaver, UpdateCurrencyList)
+  scheduler.schedule("UpdateOldCandlesEveryHour", poloniexDataSaver, RequestScheduledUpdateOldCandles)
+
+  val now = Instant.now
+  val oneWeekAgo = now.minus(7, ChronoUnit.DAYS)
 
   DB.get.run(
     MTable.getTables.map(tables => tables.map(_.name.name))
@@ -48,10 +49,9 @@ object Main extends App with Service {
     if (tables.contains(ticks.baseTableRow.tableName)) {
       log.info("Table ticks already exists")
       log.info("Filling in missing chart data")
-      val updateDelay = config.as[Int]("poloniex.update-delay-in-minutes")
-      poloniexDataSaver ! RequestUpdateOldCandles(now.minus(updateDelay, ChronoUnit.MINUTES).getEpochSecond)
+      poloniexDataSaver ! RequestUpdateOldCandles(now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
       poloniexDataSaver ! RequestInsertOldCandles(None, now.getEpochSecond)
-      system.scheduler.scheduleOnce(updateDelay minutes,
+      system.scheduler.scheduleOnce(Config.updateDelay minutes,
         poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
     } else {
       val result = DB.get.run(DBIO.seq(
@@ -69,7 +69,15 @@ object Main extends App with Service {
     }
   }
 
-  Http().bindAndHandle(routes, config.as[String]("http.interface"), config.as[Int]("http.port"))
+  Http().bindAndHandle(routes, Config.httpInterface, Config.httpPort)
+}
+
+object Config {
+  val config = ConfigFactory.load()
+  val httpInterface = config.as[String]("http.interface")
+  val httpPort = config.as[Int]("http.port")
+  val updateDelay = config.as[Int]("poloniex.update-delay-in-minutes")
+  val marginCurrencies = config.as[Seq[String]]("poloniex.margin-currencies")
 }
 
 object DB {

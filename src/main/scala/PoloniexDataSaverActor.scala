@@ -10,14 +10,13 @@ import slick.jdbc.MySQLProfile.api._
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.pattern.ask
 import akka.stream._
-import akka.stream.scaladsl._
 import akka.util.Timeout
-import com.typesafe.config.ConfigFactory
-import net.ceedubs.ficus.Ficus._
 import sext._
 import Schema._
 
 case class RequestUpdateOldCandles(until: Long)
+
+case object RequestScheduledUpdateOldCandles
 
 case class RequestInsertOldCandles(from: Option[Long], until: Long)
 
@@ -27,8 +26,6 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
   implicit val materializer = ActorMaterializer()
 
   implicit val timeout = Timeout(1 minute)
-
-  val config = ConfigFactory.load()
 
   val poller = system.actorOf(Props[PoloniexPollerActor])
 
@@ -57,6 +54,9 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
   override def receive = {
     case Poll =>
       poller ! Poll
+
+    case UpdateCurrencyList =>
+      poller ! UpdateCurrencyList
 
     case InsertCandles(timestamp, ts, obs, los) =>
       val inserts = for (c <- ts.keys) yield {
@@ -195,6 +195,10 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       result onFailure { case e =>
         log.error(e, s"Could not upsert candles at $timestamp")
       }
+
+    case RequestScheduledUpdateOldCandles =>
+      self ! RequestUpdateOldCandles(
+        Instant.now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
 
     case RequestUpdateOldCandles(until) =>
       val untilSqlTimestamp = Timestamp.from(Instant.ofEpochSecond(until))

@@ -13,7 +13,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= {
-  val akkaV       = "2.4.3"
+  val akkaV       = "2.4.10"
   val slickV      = "3.2.0-M1"
   Seq(
     "com.typesafe.akka"        %% "akka-actor" % akkaV,
