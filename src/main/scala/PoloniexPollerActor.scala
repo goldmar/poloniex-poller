@@ -45,10 +45,23 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
 
   var allCurrencies = Seq.empty[String]
 
-  self ! UpdateCurrencyList
-
   val poloniexConnectionFlow: Flow[HttpRequest, HttpResponse, Any] =
     Http().outgoingConnectionHttps("poloniex.com")
+
+  override def preStart(): Unit = {
+    val currencies = fetchMarkets().map(_.sorted)
+
+    currencies onSuccess { case cs =>
+      allCurrencies = cs
+      log.info(s"Tracking the following currencies: $cs")
+    }
+
+    currencies onFailure { case e =>
+      log.error(e, "Could not fetch Poloniex markets")
+    }
+
+    Await.result(currencies, 10 seconds)
+  }
 
   def poloniexRequest(request: HttpRequest): Future[HttpResponse] =
     Source.single(request).via(poloniexConnectionFlow).runWith(Sink.head)
