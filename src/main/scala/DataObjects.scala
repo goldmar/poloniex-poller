@@ -154,10 +154,10 @@ case class SpecialCSVTick(datum: Timestamp,
 object SpecialCSVTick {
   def fromTick(csvTick: CSVTick): SpecialCSVTick =
     SpecialCSVTick(datum = csvTick.timestamp, currencyPair = csvTick.currencyPair,
-      open = csvTick.open, high = csvTick.high,
-      low = csvTick.low, close = csvTick.close,
+      open = csvTick.open.map(_ * 1000), high = csvTick.high.map(_ * 1000),
+      low = csvTick.low.map(_ * 1000), close = csvTick.close.map(_ * 1000),
       volume = csvTick.volume, volumeDailyAvgPast7Days = csvTick.volumeAvgPast7Days.map(_ * 288),
-      bidAskMidpoint = csvTick.bidAskMidpoint,
+      bidAskMidpoint = csvTick.bidAskMidpoint.map(_ * 1000),
       bidPriceAvg1 = csvTick.bidPriceAvg1.map(_ * 100), bidPriceAvg10 = csvTick.bidPriceAvg10.map(_ * 100),
       bidPriceAvg25 = csvTick.bidPriceAvg25.map(_ * 100), bidPriceAvg50 = csvTick.bidPriceAvg50.map(_ * 100),
       bidPriceAvg100 = csvTick.bidPriceAvg100.map(_ * 100), bidPriceAvg500 = csvTick.bidPriceAvg500.map(_ * 100),
