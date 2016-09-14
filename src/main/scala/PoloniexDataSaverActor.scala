@@ -23,7 +23,14 @@ case class RequestInsertOldCandles(from: Option[Long], until: Long)
 class PoloniexDataSaverActor extends Actor with ActorLogging {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
-  implicit val materializer = ActorMaterializer()
+
+  val decider: Supervision.Decider = { e =>
+    log.error("Unhandled exception in stream", e)
+    Supervision.Stop
+  }
+
+  val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
+  implicit val materializer = ActorMaterializer(materializerSettings)
 
   implicit val timeout = Timeout(1 minute)
 

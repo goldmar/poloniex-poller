@@ -6,19 +6,18 @@ import scala.language.postfixOps
 import scala.collection.immutable.{Map, SortedSet}
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.{after, pipe}
+import akka.stream._
+import akka.stream.scaladsl._
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.HostConnectionPool
 import akka.http.scaladsl.client.RequestBuilding
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl._
-import com.typesafe.config.ConfigFactory
-import net.ceedubs.ficus.Ficus._
 import sext._
 
 case object Poll
@@ -41,12 +40,19 @@ case object ListAllCurrencies
 class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
-  implicit val materializer = ActorMaterializer()
+
+  val decider: Supervision.Decider = { e =>
+    log.error("Unhandled exception in stream", e)
+    Supervision.Stop
+  }
+
+  val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
+  implicit val materializer = ActorMaterializer(materializerSettings)
 
   var allCurrencies = Seq.empty[String]
 
-  val poloniexConnectionFlow: Flow[HttpRequest, HttpResponse, Any] =
-    Http().outgoingConnectionHttps("poloniex.com")
+  val poloniexPoolFlow: Flow[(HttpRequest, String), (Try[HttpResponse], String), HostConnectionPool] =
+    Http().cachedHostConnectionPoolHttps[String]("poloniex.com")
 
   override def preStart(): Unit = {
     val currencies = fetchMarkets().map(_.sorted)
@@ -63,11 +69,15 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     Await.result(currencies, 10 seconds)
   }
 
-  def poloniexRequest(request: HttpRequest): Future[HttpResponse] =
-    Source.single(request).via(poloniexConnectionFlow).runWith(Sink.head)
+  def poloniexSingleRequest(request: HttpRequest): Future[HttpResponse] = {
+    Source.single(request -> "unique").via(poloniexPoolFlow).runWith(Sink.head).flatMap {
+      case (Success(r: HttpResponse), _) ⇒ Future.successful(r)
+      case (Failure(f), _) ⇒ Future.failed(f)
+    }
+  }
 
   def fetchMarkets(): Future[Seq[String]] = {
-    poloniexRequest(RequestBuilding.Get(
+    poloniexSingleRequest(RequestBuilding.Get(
       s"/public?command=returnTicker")
     ).flatMap { response =>
       response.status match {
@@ -85,7 +95,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   }
 
   def fetchTickers(): Future[Map[String, BigDecimal]] = {
-    poloniexRequest(RequestBuilding.Get(
+    poloniexSingleRequest(RequestBuilding.Get(
       s"/public?command=returnTicker")
     ).flatMap { response =>
       response.status match {
@@ -106,25 +116,32 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
 
   def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Seq[ChartDataCandle]]] = {
     val requests = for (c <- allCurrencies) yield
-      poloniexRequest(RequestBuilding.Get(
-        s"/public?command=returnChartData&currencyPair=$c&start=$start&end=$end&period=300")
-      ).map(c -> _)
-    Future.sequence(requests).flatMap { seq =>
-      val mappedSeq: Seq[Future[(String, Seq[ChartDataCandle])]] =
-        seq.map { case (c: String, response: HttpResponse) =>
+      RequestBuilding.Get(
+        s"/public?command=returnChartData&currencyPair=$c&start=$start&end=$end&period=300"
+      ) -> c
+    Source(requests.to[collection.immutable.Iterable])
+      .via(poloniexPoolFlow)
+      .mapAsyncUnordered(200) {
+        case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
               Unmarshal(response.entity).to[Seq[ChartDataCandleJson]].map(cdjSeq =>
                 c -> cdjSeq.map(j => ChartDataCandle(j.date, j.open, j.high, j.low, j.close, j.volume)))
-            case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
-              val error = s"Poloniex chart data request failed with status code ${response.status} and entity $entity"
-              log.error(error)
-              Future.failed(new IOException(error))
-            }
+            case _ =>
+              Unmarshal(response.entity).to[String].flatMap { entity =>
+                val error = s"Poloniex chart data request for currency $c failed with status code ${response.status} and entity $entity"
+                log.error(error)
+                Future.failed(new IOException(error))
+              }
           }
-        }
-      Future.sequence(mappedSeq).map(_.toMap)
-    }
+
+        case (Failure(e), c) =>
+          log.error(e, "Poloniex chart data request failed")
+          Future.failed(e)
+      }
+      .runFold(Map.empty[String, Seq[ChartDataCandle]]) { case (m, (c, lob)) =>
+        m + (c -> lob)
+      }
   }
 
   def fetchChartDataAsNestedMap(start: Long, end: Long): Future[Map[Long, Map[String, ChartDataCandle]]] = {
@@ -138,7 +155,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
   }
 
   def fetchOrderBooks(): Future[Map[String, OrderBook]] = {
-    poloniexRequest(RequestBuilding.Get(
+    poloniexSingleRequest(RequestBuilding.Get(
       s"/public?command=returnOrderBook&currencyPair=all&depth=999999")
     ).flatMap { response =>
       response.status match {
@@ -165,12 +182,14 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     }
 
     val requests = for (c <- Config.marginCurrencies) yield
-      poloniexRequest(RequestBuilding.Get(
-        s"/public?command=returnLoanOrders&currency=$c&limit=999999")
-      ).map(s"BTC_$c" -> _)
-    Future.sequence(requests).flatMap { seq =>
-      val mappedSeq: Seq[Future[(String, LoanOrderBook)]] =
-        seq.map { case (c: String, response: HttpResponse) =>
+      RequestBuilding.Get(
+        s"/public?command=returnLoanOrders&currency=$c&limit=999999"
+      ) -> s"BTC_$c"
+
+    Source(requests.to[collection.immutable.Iterable])
+      .via(poloniexPoolFlow)
+      .mapAsyncUnordered(200) {
+        case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
               Unmarshal(response.entity).to[LoanOrderBookJson].map { lobj =>
@@ -182,14 +201,19 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
                 )
               }
             case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
-              val error = s"Poloniex loan order book request failed with status code ${response.status} and entity $entity"
+              val error = s"Poloniex loan order book request for currency $c failed with status code ${response.status} and entity $entity"
               log.error(error)
               Future.failed(new IOException(error))
             }
           }
-        }
-      Future.sequence(mappedSeq).map(_.toMap)
-    }
+
+        case (Failure(e), c) =>
+          log.error(e, "Poloniex loan order book request failed")
+          Future.failed(e)
+      }
+      .runFold(Map.empty[String, LoanOrderBook]) { case (m, (c, lob)) =>
+        m + (c -> lob)
+      }
   }
 
   override def receive = {
