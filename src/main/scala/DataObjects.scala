@@ -84,6 +84,7 @@ case class CSVTick(timestamp: Timestamp, currencyPair: String,
                    loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
                    loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
                    loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
+                   loanOfferRateAvgAll: Option[BigDecimal],
                    loanOfferAmountSum: Option[BigDecimal], loanOfferAmountSumRelToAvgVol: Option[BigDecimal])
 
 object CSVTick {
@@ -116,6 +117,7 @@ object CSVTick {
       loanOfferRateAvg100 = tick.loanOfferRateAvg100, loanOfferRateAvg500 = tick.loanOfferRateAvg500,
       loanOfferRateAvg1000 = tick.loanOfferRateAvg1000, loanOfferRateAvg2500 = tick.loanOfferRateAvg2500,
       loanOfferRateAvg5000 = tick.loanOfferRateAvg5000, loanOfferRateAvg10000 = tick.loanOfferRateAvg10000,
+      loanOfferRateAvgAll = tick.loanOfferRateAvgAll,
       loanOfferAmountSum = tick.loanOfferAmountSum, loanOfferAmountSumRelToAvgVol = None)
 }
 
@@ -148,6 +150,7 @@ case class SpecialCSVTick(datum: Timestamp,
                           loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
                           loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
                           loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
+                          loanOfferRateAvgAll: Option[BigDecimal],
                           loanOfferAmountSum: Option[BigDecimal],
                           loanOfferAmountSumRelToDailyAvgVol: Option[BigDecimal])
 
@@ -186,6 +189,7 @@ object SpecialCSVTick {
       loanOfferRateAvg2500 = csvTick.loanOfferRateAvg2500.map(_ * 100),
       loanOfferRateAvg5000 = csvTick.loanOfferRateAvg5000.map(_ * 100),
       loanOfferRateAvg10000 = csvTick.loanOfferRateAvg10000.map(_ * 100),
+      loanOfferRateAvgAll = csvTick.loanOfferRateAvgAll.map(_ * 100),
       loanOfferAmountSum = csvTick.loanOfferAmountSum,
       loanOfferAmountSumRelToDailyAvgVol = csvTick.loanOfferAmountSumRelToAvgVol.map(_ / 288))
 }

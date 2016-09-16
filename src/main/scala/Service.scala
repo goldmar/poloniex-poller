@@ -125,9 +125,9 @@ trait Service extends JsonProtocols {
         implicit val converter = germanTimestampConverter
         val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
         val specialCSVLineSource = csvTickSource.map {
-          case tick@t if t.volume.getOrElse(BigDecimal(0)) > 0 =>
+          case tick if tick.volume.getOrElse(BigDecimal(0)) > 0 =>
             CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
-          case tick@t =>
+          case tick =>
             CSVLine(SpecialCSVTick.fromTick(tick.copy(
               open = None, high = None, low = None, close = None
             )).toCSV())
@@ -156,20 +156,20 @@ trait Service extends JsonProtocols {
               }
             }
           } ~
-          path(Segment) { currencyPair =>
-            get {
-              parameters(
-                Symbol("special") ? false) { special =>
-                complete {
-                  val query = ticks
-                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
-                    .sortBy(_.timestamp.asc)
+            path(Segment) { currencyPair =>
+              get {
+                parameters(
+                  Symbol("special") ? false) { special =>
+                  complete {
+                    val query = ticks
+                      .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                      .sortBy(_.timestamp.asc)
 
-                  streamCSV(query, special)
+                    streamCSV(query, special)
+                  }
                 }
               }
             }
-          }
         }
       }
     }

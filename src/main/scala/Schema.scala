@@ -120,6 +120,8 @@ object Schema {
 
     def loanOfferRateAvg10000 = column[Option[BigDecimal]]("loan_offer_rate_avg_10000", O.SqlType("DECIMAL(20,8)"))
 
+    def loanOfferRateAvgAll = column[Option[BigDecimal]]("loan_offer_rate_avg_all", O.SqlType("DECIMAL(20,8)"))
+
     def loanOfferAmountSum = column[Option[BigDecimal]]("loan_offer_amount_sum", O.SqlType("DECIMAL(20,8)"))
 
     def idx1 = index("idx1", (timestamp, currencyPair), unique = true)
@@ -141,7 +143,7 @@ object Schema {
         askAmountSum75percent :: askAmountSum85percent :: askAmountSum100percent :: askAmountSum200percent ::
         loanOfferRateAvg1 :: loanOfferRateAvg10 :: loanOfferRateAvg25 :: loanOfferRateAvg50 :: loanOfferRateAvg100 ::
         loanOfferRateAvg500 :: loanOfferRateAvg1000 :: loanOfferRateAvg2500 :: loanOfferRateAvg5000 ::
-        loanOfferRateAvg10000 :: loanOfferAmountSum :: HNil) <> (
+        loanOfferRateAvg10000 :: loanOfferRateAvgAll :: loanOfferAmountSum :: HNil) <> (
         (dbRow: tickGeneric.Repr) => tickGeneric.from(dbRow),
         (caseClass: Tick) => Some(tickGeneric.to(caseClass))
         )
@@ -178,7 +180,7 @@ object Schema {
                   loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
                   loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
                   loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
-                  loanOfferAmountSum: Option[BigDecimal])
+                  loanOfferRateAvgAll: Option[BigDecimal], loanOfferAmountSum: Option[BigDecimal])
 
   object Tick {
     //noinspection NameBooleanParameters
@@ -188,7 +190,7 @@ object Schema {
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
-      None, None, None, None, None, None, None
+      None, None, None, None, None, None, None, None
     )
   }
 

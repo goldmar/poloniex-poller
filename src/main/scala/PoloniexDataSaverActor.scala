@@ -131,6 +131,10 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           loanOfferRateAvg2500 = aggregateLoanOffers(c, los, bidAskMidpoint, 2500),
           loanOfferRateAvg5000 = aggregateLoanOffers(c, los, bidAskMidpoint, 5000),
           loanOfferRateAvg10000 = aggregateLoanOffers(c, los, bidAskMidpoint, 10000),
+          loanOfferRateAvgAll = los.get(c).map(_.offers.foldLeft((BigDecimal(0), BigDecimal(0))) {
+            case ((weightedRateSum, amountSum), next) =>
+              weightedRateSum + next.amount * next.rate -> (amountSum + next.amount)
+          }).collect { case (weightedRateSum, amountSum) if amountSum > 0 => weightedRateSum / amountSum },
           loanOfferAmountSum = los.get(c).map(_.offers.map(_.amount).sum).map(_ * bidAskMidpoint)
         )
       }
