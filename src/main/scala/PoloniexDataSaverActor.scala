@@ -14,11 +14,11 @@ import akka.util.Timeout
 import sext._
 import Schema._
 
-case class RequestUpdateOldCandles(until: Long)
+case class RequestUpdateOldChartData(until: Long)
 
-case object RequestScheduledUpdateOldCandles
+case object RequestScheduledUpdateOldChartData
 
-case class RequestInsertOldCandles(from: Option[Long], until: Long)
+case class RequestInsertOldChartData(from: Option[Long], until: Long)
 
 class PoloniexDataSaverActor extends Actor with ActorLogging {
   implicit val system = context.system
@@ -54,8 +54,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
     }
   }
 
-  def aggregateLoanOffers(c: String, los: Map[String, LoanOrderBook], btcPrice: BigDecimal, depth: BigDecimal): Option[BigDecimal] = {
-    los.get(c).flatMap(lo => aggregateItems(lo.offers.toSeq.map(i => i.rate -> i.amount * btcPrice), depth))
+  def aggregateLoanOffers(c: String, lobs: Map[String, LoanOrderBook], btcPrice: BigDecimal, depth: BigDecimal): Option[BigDecimal] = {
+    lobs.get(c).flatMap(lob => aggregateItems(lob.offers.toSeq.map(i => i.rate -> i.amount * btcPrice), depth))
   }
 
   override def receive = {
@@ -65,7 +65,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
     case UpdateCurrencyList =>
       poller ! UpdateCurrencyList
 
-    case InsertCandles(timestamp, ts, obs, los) =>
+    case InsertData(timestamp, ts, obs, lobs) =>
       val inserts = for (c <- ts.keys) yield {
         val btcPrice = ts(c)
         val bids: Seq[OrderBookItem] = obs(c).bids.toSeq
@@ -87,6 +87,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           chartDataFinal = false,
           bidAskMidpoint = Some(bidAskMidpoint),
           bidPriceAvg1 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 1).map(_ / bidAskMidpoint - 1),
+          bidPriceAvg5 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 5).map(_ / bidAskMidpoint - 1),
           bidPriceAvg10 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 10).map(_ / bidAskMidpoint - 1),
           bidPriceAvg25 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 25).map(_ / bidAskMidpoint - 1),
           bidPriceAvg50 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 50).map(_ / bidAskMidpoint - 1),
@@ -97,6 +98,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           bidPriceAvg5000 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 5000).map(_ / bidAskMidpoint - 1),
           bidPriceAvg10000 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 10000).map(_ / bidAskMidpoint - 1),
           askPriceAvg1 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 1).map(_ / bidAskMidpoint - 1),
+          askPriceAvg5 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 5).map(_ / bidAskMidpoint - 1),
           askPriceAvg10 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 10).map(_ / bidAskMidpoint - 1),
           askPriceAvg25 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 25).map(_ / bidAskMidpoint - 1),
           askPriceAvg50 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 50).map(_ / bidAskMidpoint - 1),
@@ -106,13 +108,13 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           askPriceAvg2500 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 2500).map(_ / bidAskMidpoint - 1),
           askPriceAvg5000 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 5000).map(_ / bidAskMidpoint - 1),
           askPriceAvg10000 = aggregateItems(asks.map(i => i.price -> i.amount * bidAskMidpoint), 10000).map(_ / bidAskMidpoint - 1),
-          bidAmountSum5percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.95).map(b => b.price * b.amount).sum),
-          bidAmountSum10percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.90).map(b => b.price * b.amount).sum),
-          bidAmountSum25percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.75).map(b => b.price * b.amount).sum),
-          bidAmountSum50percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.50).map(b => b.price * b.amount).sum),
-          bidAmountSum75percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.25).map(b => b.price * b.amount).sum),
-          bidAmountSum85percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.15).map(b => b.price * b.amount).sum),
-          bidAmountSum100percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.00).map(b => b.price * b.amount).sum),
+          bidAmountSum5percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.95).map(i => i.price * i.amount).sum),
+          bidAmountSum10percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.90).map(i => i.price * i.amount).sum),
+          bidAmountSum25percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.75).map(i => i.price * i.amount).sum),
+          bidAmountSum50percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.50).map(i => i.price * i.amount).sum),
+          bidAmountSum75percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.25).map(i => i.price * i.amount).sum),
+          bidAmountSum85percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.15).map(i => i.price * i.amount).sum),
+          bidAmountSum100percent = Some(bids.filter(_.price >= bidAskMidpoint * 0.00).map(i => i.price * i.amount).sum),
           askAmountSum5percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.05).map(_.amount).sum * bidAskMidpoint),
           askAmountSum10percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.10).map(_.amount).sum * bidAskMidpoint),
           askAmountSum25percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.25).map(_.amount).sum * bidAskMidpoint),
@@ -121,21 +123,22 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           askAmountSum85percent = Some(asks.filter(_.price <= bidAskMidpoint * 1.85).map(_.amount).sum * bidAskMidpoint),
           askAmountSum100percent = Some(asks.filter(_.price <= bidAskMidpoint * 2.00).map(_.amount).sum * bidAskMidpoint),
           askAmountSum200percent = Some(asks.filter(_.price <= bidAskMidpoint * 3.00).map(_.amount).sum * bidAskMidpoint),
-          loanOfferRateAvg1 = aggregateLoanOffers(c, los, bidAskMidpoint, 1),
-          loanOfferRateAvg10 = aggregateLoanOffers(c, los, bidAskMidpoint, 10),
-          loanOfferRateAvg25 = aggregateLoanOffers(c, los, bidAskMidpoint, 25),
-          loanOfferRateAvg50 = aggregateLoanOffers(c, los, bidAskMidpoint, 50),
-          loanOfferRateAvg100 = aggregateLoanOffers(c, los, bidAskMidpoint, 100),
-          loanOfferRateAvg500 = aggregateLoanOffers(c, los, bidAskMidpoint, 500),
-          loanOfferRateAvg1000 = aggregateLoanOffers(c, los, bidAskMidpoint, 1000),
-          loanOfferRateAvg2500 = aggregateLoanOffers(c, los, bidAskMidpoint, 2500),
-          loanOfferRateAvg5000 = aggregateLoanOffers(c, los, bidAskMidpoint, 5000),
-          loanOfferRateAvg10000 = aggregateLoanOffers(c, los, bidAskMidpoint, 10000),
-          loanOfferRateAvgAll = los.get(c).map(_.offers.foldLeft((BigDecimal(0), BigDecimal(0))) {
+          loanOfferRateAvg1 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 1),
+          loanOfferRateAvg5 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 5),
+          loanOfferRateAvg10 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 10),
+          loanOfferRateAvg25 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 25),
+          loanOfferRateAvg50 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 50),
+          loanOfferRateAvg100 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 100),
+          loanOfferRateAvg500 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 500),
+          loanOfferRateAvg1000 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 1000),
+          loanOfferRateAvg2500 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 2500),
+          loanOfferRateAvg5000 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 5000),
+          loanOfferRateAvg10000 = aggregateLoanOffers(c, lobs, bidAskMidpoint, 10000),
+          loanOfferRateAvgAll = lobs.get(c).map(_.offers.foldLeft((BigDecimal(0), BigDecimal(0))) {
             case ((weightedRateSum, amountSum), next) =>
               weightedRateSum + next.amount * next.rate -> (amountSum + next.amount)
           }).collect { case (weightedRateSum, amountSum) if amountSum > 0 => weightedRateSum / amountSum },
-          loanOfferAmountSum = los.get(c).map(_.offers.map(_.amount).sum).map(_ * bidAskMidpoint)
+          loanOfferAmountSum = lobs.get(c).map(_.offers.map(_.amount).sum).map(_ * bidAskMidpoint)
         )
       }
 
@@ -151,13 +154,13 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         log.error(e, s"Could not insert new data at timestamp $timestamp")
       }
 
-    case UpsertCandleChartData(timestamp, cds) =>
+    case UpsertChartData(timestamp, cds) =>
       val instant = Instant.ofEpochSecond(timestamp)
       val sqlTimestamp = Timestamp.from(instant)
       val sqlTimstamp5MinAgo = Timestamp.from(instant.minus(5, ChronoUnit.MINUTES))
 
-      val updatesFuture = Future.sequence(cds.map { case (c, cdcOption) =>
-        (cdcOption match {
+      val updatesFuture = Future.sequence(cds.map { case (c, cdOption) =>
+        (cdOption match {
           case Some(candle) =>
             Future(Some(candle))
           case None =>
@@ -168,26 +171,26 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
             ).map(tickOption =>
               tickOption.flatMap(tick =>
                 tick.close.map(previousClose =>
-                  ChartDataCandle(timestamp, previousClose, previousClose, previousClose, previousClose, 0))))
-        }).map { cdcOption =>
+                  ChartData(timestamp, previousClose, previousClose, previousClose, previousClose, 0))))
+        }).map { cdOption =>
           for {
             rowsAffected <- ticks
               .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
               .map(t =>
                 (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
               .update(
-                cdcOption.map(_.open), cdcOption.map(_.high), cdcOption.map(_.low),
-                cdcOption.map(_.close), cdcOption.map(_.volume), cdcOption.map(_ => true).getOrElse(false))
+                cdOption.map(_.open), cdOption.map(_.high), cdOption.map(_.low),
+                cdOption.map(_.close), cdOption.map(_.volume), cdOption.map(_ => true).getOrElse(false))
             result <- rowsAffected match {
               case 0 => ticks += Tick.empty().copy(
                 timestamp = sqlTimestamp,
                 currencyPair = c,
-                open = cdcOption.map(_.open),
-                high = cdcOption.map(_.high),
-                low = cdcOption.map(_.low),
-                close = cdcOption.map(_.close),
-                volume = cdcOption.map(_.volume),
-                chartDataFinal = cdcOption.map(_ => true).getOrElse(false))
+                open = cdOption.map(_.open),
+                high = cdOption.map(_.high),
+                low = cdOption.map(_.low),
+                close = cdOption.map(_.close),
+                volume = cdOption.map(_.volume),
+                chartDataFinal = cdOption.map(_ => true).getOrElse(false))
               case 1 => DBIO.successful(1)
               case n => DBIO.failed(new RuntimeException(
                 s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
@@ -207,11 +210,11 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         log.error(e, s"Could not upsert candles at $timestamp")
       }
 
-    case RequestScheduledUpdateOldCandles =>
-      self ! RequestUpdateOldCandles(
+    case RequestScheduledUpdateOldChartData =>
+      self ! RequestUpdateOldChartData(
         Instant.now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
 
-    case RequestUpdateOldCandles(until) =>
+    case RequestUpdateOldChartData(until) =>
       val untilSqlTimestamp = Timestamp.from(Instant.ofEpochSecond(until))
       val query = ticks
         .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
@@ -226,7 +229,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
           log.info(s"Updating old candles since $start")
 
-          (poller ? FetchOldChartData(start, end)).mapTo[OldCandleChartData] onSuccess { case OldCandleChartData(cds) =>
+          (poller ? FetchOldChartData(start, end)).mapTo[OldChartData] onSuccess { case OldChartData(cds) =>
             val query = ticks
               .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
               .sortBy(_.timestamp.asc)
@@ -250,7 +253,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               }
 
               for (t <- candles.keys.toSeq.sorted) {
-                self ! UpsertCandleChartData(t, candles(t))
+                self ! UpsertChartData(t, candles(t))
               }
             }
           }
@@ -259,7 +262,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           log.info("All candles are up-to-date")
       }
 
-    case RequestInsertOldCandles(fromOption, until) =>
+    case RequestInsertOldChartData(fromOption, until) =>
       val fromFuture = fromOption match {
         case Some(from) =>
           Future(from)
@@ -276,14 +279,14 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
       fromFuture.foreach { from =>
         val allCurrencies = (poller ? ListAllCurrencies).mapTo[Seq[String]]
-        val oldChartData = (poller ? FetchOldChartData(from, until)).mapTo[OldCandleChartData]
+        val oldChartData = (poller ? FetchOldChartData(from, until)).mapTo[OldChartData]
         for {
           allCs <- allCurrencies
           ocd <- oldChartData
         } yield {
           val cds = ocd.cds
           for (t <- cds.keys.toSeq.sorted if t >= from && t <= until) {
-            self ! UpsertCandleChartData(t, allCs.map(c => c -> cds(t).get(c)).toMap)
+            self ! UpsertChartData(t, allCs.map(c => c -> cds(t).get(c)).toMap)
           }
         }
       }

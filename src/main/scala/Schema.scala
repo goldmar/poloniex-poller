@@ -32,6 +32,8 @@ object Schema {
 
     def bidPriceAvg1 = column[Option[BigDecimal]]("bid_price_avg_1", O.SqlType("DECIMAL(20,8)"))
 
+    def bidPriceAvg5 = column[Option[BigDecimal]]("bid_price_avg_5", O.SqlType("DECIMAL(20,8)"))
+
     def bidPriceAvg10 = column[Option[BigDecimal]]("bid_price_avg_10", O.SqlType("DECIMAL(20,8)"))
 
     def bidPriceAvg25 = column[Option[BigDecimal]]("bid_price_avg_25", O.SqlType("DECIMAL(20,8)"))
@@ -51,6 +53,8 @@ object Schema {
     def bidPriceAvg10000 = column[Option[BigDecimal]]("bid_price_avg_10000", O.SqlType("DECIMAL(20,8)"))
 
     def askPriceAvg1 = column[Option[BigDecimal]]("ask_price_avg_1", O.SqlType("DECIMAL(20,8)"))
+
+    def askPriceAvg5 = column[Option[BigDecimal]]("ask_price_avg_5", O.SqlType("DECIMAL(20,8)"))
 
     def askPriceAvg10 = column[Option[BigDecimal]]("ask_price_avg_10", O.SqlType("DECIMAL(20,8)"))
 
@@ -102,6 +106,8 @@ object Schema {
 
     def loanOfferRateAvg1 = column[Option[BigDecimal]]("loan_offer_rate_avg_1", O.SqlType("DECIMAL(20,8)"))
 
+    def loanOfferRateAvg5 = column[Option[BigDecimal]]("loan_offer_rate_avg_5", O.SqlType("DECIMAL(20,8)"))
+
     def loanOfferRateAvg10 = column[Option[BigDecimal]]("loan_offer_rate_avg_10", O.SqlType("DECIMAL(20,8)"))
 
     def loanOfferRateAvg25 = column[Option[BigDecimal]]("loan_offer_rate_avg_25", O.SqlType("DECIMAL(20,8)"))
@@ -132,18 +138,18 @@ object Schema {
 
     def * = {
       val tickGeneric = Generic[Tick]
-      (id :: timestamp :: currencyPair :: open :: high :: low :: close :: volume :: chartDataFinal ::
-        bidAskMidpoint :: bidPriceAvg1 :: bidPriceAvg10 :: bidPriceAvg25 :: bidPriceAvg50 ::
-        bidPriceAvg100 :: bidPriceAvg500 :: bidPriceAvg1000 :: bidPriceAvg2500 :: bidPriceAvg5000 ::
-        bidPriceAvg10000 :: askPriceAvg1 :: askPriceAvg10 :: askPriceAvg25 :: askPriceAvg50 :: askPriceAvg100 ::
+      (id :: timestamp :: currencyPair :: open :: high :: low :: close :: volume :: chartDataFinal :: bidAskMidpoint ::
+        bidPriceAvg1 :: bidPriceAvg5 :: bidPriceAvg10 :: bidPriceAvg25 :: bidPriceAvg50 :: bidPriceAvg100 ::
+        bidPriceAvg500 :: bidPriceAvg1000 :: bidPriceAvg2500 :: bidPriceAvg5000 :: bidPriceAvg10000 ::
+        askPriceAvg1 :: askPriceAvg5 :: askPriceAvg10 :: askPriceAvg25 :: askPriceAvg50 :: askPriceAvg100 ::
         askPriceAvg500 :: askPriceAvg1000 :: askPriceAvg2500 :: askPriceAvg5000 :: askPriceAvg10000 ::
         bidAmountSum5percent :: bidAmountSum10percent :: bidAmountSum25percent :: bidAmountSum50percent ::
         bidAmountSum75percent :: bidAmountSum85percent :: bidAmountSum100percent ::
         askAmountSum5percent :: askAmountSum10percent :: askAmountSum25percent :: askAmountSum50percent ::
         askAmountSum75percent :: askAmountSum85percent :: askAmountSum100percent :: askAmountSum200percent ::
-        loanOfferRateAvg1 :: loanOfferRateAvg10 :: loanOfferRateAvg25 :: loanOfferRateAvg50 :: loanOfferRateAvg100 ::
-        loanOfferRateAvg500 :: loanOfferRateAvg1000 :: loanOfferRateAvg2500 :: loanOfferRateAvg5000 ::
-        loanOfferRateAvg10000 :: loanOfferRateAvgAll :: loanOfferAmountSum :: HNil) <> (
+        loanOfferRateAvg1 :: loanOfferRateAvg5 :: loanOfferRateAvg10 :: loanOfferRateAvg25 :: loanOfferRateAvg50 ::
+        loanOfferRateAvg100 :: loanOfferRateAvg500 :: loanOfferRateAvg1000 :: loanOfferRateAvg2500 ::
+        loanOfferRateAvg5000 :: loanOfferRateAvg10000 :: loanOfferRateAvgAll :: loanOfferAmountSum :: HNil) <> (
         (dbRow: tickGeneric.Repr) => tickGeneric.from(dbRow),
         (caseClass: Tick) => Some(tickGeneric.to(caseClass))
         )
@@ -157,12 +163,12 @@ object Schema {
                   low: Option[BigDecimal], close: Option[BigDecimal],
                   volume: Option[BigDecimal], chartDataFinal: Boolean,
                   bidAskMidpoint: Option[BigDecimal],
-                  bidPriceAvg1: Option[BigDecimal], bidPriceAvg10: Option[BigDecimal],
+                  bidPriceAvg1: Option[BigDecimal], bidPriceAvg5: Option[BigDecimal], bidPriceAvg10: Option[BigDecimal],
                   bidPriceAvg25: Option[BigDecimal], bidPriceAvg50: Option[BigDecimal],
                   bidPriceAvg100: Option[BigDecimal], bidPriceAvg500: Option[BigDecimal],
                   bidPriceAvg1000: Option[BigDecimal], bidPriceAvg2500: Option[BigDecimal],
                   bidPriceAvg5000: Option[BigDecimal], bidPriceAvg10000: Option[BigDecimal],
-                  askPriceAvg1: Option[BigDecimal], askPriceAvg10: Option[BigDecimal],
+                  askPriceAvg1: Option[BigDecimal], askPriceAvg5: Option[BigDecimal], askPriceAvg10: Option[BigDecimal],
                   askPriceAvg25: Option[BigDecimal], askPriceAvg50: Option[BigDecimal],
                   askPriceAvg100: Option[BigDecimal], askPriceAvg500: Option[BigDecimal],
                   askPriceAvg1000: Option[BigDecimal], askPriceAvg2500: Option[BigDecimal],
@@ -175,22 +181,23 @@ object Schema {
                   askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
                   askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
                   askAmountSum200percent: Option[BigDecimal],
-                  loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg10: Option[BigDecimal],
-                  loanOfferRateAvg25: Option[BigDecimal], loanOfferRateAvg50: Option[BigDecimal],
-                  loanOfferRateAvg100: Option[BigDecimal], loanOfferRateAvg500: Option[BigDecimal],
-                  loanOfferRateAvg1000: Option[BigDecimal], loanOfferRateAvg2500: Option[BigDecimal],
-                  loanOfferRateAvg5000: Option[BigDecimal], loanOfferRateAvg10000: Option[BigDecimal],
-                  loanOfferRateAvgAll: Option[BigDecimal], loanOfferAmountSum: Option[BigDecimal])
+                  loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg5: Option[BigDecimal],
+                  loanOfferRateAvg10: Option[BigDecimal], loanOfferRateAvg25: Option[BigDecimal],
+                  loanOfferRateAvg50: Option[BigDecimal], loanOfferRateAvg100: Option[BigDecimal],
+                  loanOfferRateAvg500: Option[BigDecimal], loanOfferRateAvg1000: Option[BigDecimal],
+                  loanOfferRateAvg2500: Option[BigDecimal], loanOfferRateAvg5000: Option[BigDecimal],
+                  loanOfferRateAvg10000: Option[BigDecimal], loanOfferRateAvgAll: Option[BigDecimal],
+                  loanOfferAmountSum: Option[BigDecimal])
 
   object Tick {
     //noinspection NameBooleanParameters
     def empty() = Tick(
-      -1, Timestamp.from(Instant.EPOCH), "", None, None, None, None, None, false,
+      -1, Timestamp.from(Instant.EPOCH), "", None, None, None, None, None, false, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
-      None, None, None, None, None, None, None, None
+      None, None, None, None, None, None, None, None, None, None
     )
   }
 

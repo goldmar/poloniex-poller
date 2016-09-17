@@ -156,20 +156,20 @@ trait Service extends JsonProtocols {
               }
             }
           } ~
-            path(Segment) { currencyPair =>
-              get {
-                parameters(
-                  Symbol("special") ? false) { special =>
-                  complete {
-                    val query = ticks
-                      .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
-                      .sortBy(_.timestamp.asc)
+          path(Segment) { currencyPair =>
+            get {
+              parameters(
+                Symbol("special") ? false) { special =>
+                complete {
+                  val query = ticks
+                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                    .sortBy(_.timestamp.asc)
 
-                    streamCSV(query, special)
-                  }
+                  streamCSV(query, special)
                 }
               }
             }
+          }
         }
       }
     }

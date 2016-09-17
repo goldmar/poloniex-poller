@@ -38,7 +38,7 @@ object Main extends App with Service {
 
   scheduler.schedule("PollEvery5Minutes", poloniexDataSaver, Poll)
   scheduler.schedule("UpdateCurrenciesEveryHour", poloniexDataSaver, UpdateCurrencyList)
-  scheduler.schedule("UpdateOldCandlesEveryHour", poloniexDataSaver, RequestScheduledUpdateOldCandles)
+  scheduler.schedule("UpdateOldCandlesEveryHour", poloniexDataSaver, RequestScheduledUpdateOldChartData)
 
   val now = Instant.now
   val oneWeekAgo = now.minus(7, ChronoUnit.DAYS)
@@ -49,10 +49,10 @@ object Main extends App with Service {
     if (tables.contains(ticks.baseTableRow.tableName)) {
       log.info("Table ticks already exists")
       log.info("Filling in missing chart data")
-      poloniexDataSaver ! RequestUpdateOldCandles(now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
-      poloniexDataSaver ! RequestInsertOldCandles(None, now.getEpochSecond)
+      poloniexDataSaver ! RequestUpdateOldChartData(now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
+      poloniexDataSaver ! RequestInsertOldChartData(None, now.getEpochSecond)
       system.scheduler.scheduleOnce(Config.updateDelay minutes,
-        poloniexDataSaver, RequestUpdateOldCandles(now.getEpochSecond))
+        poloniexDataSaver, RequestUpdateOldChartData(now.getEpochSecond))
     } else {
       val result = DB.get.run(DBIO.seq(
         ticks.schema.create
@@ -62,7 +62,7 @@ object Main extends App with Service {
         case Success(_) =>
           log.info("Successfully created table ticks")
           log.info("Filling in previous chart data")
-          poloniexDataSaver ! RequestInsertOldCandles(Some(oneWeekAgo.getEpochSecond), now.getEpochSecond)
+          poloniexDataSaver ! RequestInsertOldChartData(Some(oneWeekAgo.getEpochSecond), now.getEpochSecond)
         case Failure(e) =>
           log.error(e, "Could not create table ticks")
       }

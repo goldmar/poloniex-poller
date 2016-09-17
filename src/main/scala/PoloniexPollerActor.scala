@@ -28,12 +28,12 @@ case class UpdatedCurrencyList(cs: Seq[String])
 
 case class FetchOldChartData(start: Long, end: Long)
 
-case class InsertCandles(timestamp: Long, t: Map[String, BigDecimal],
-                         obs: Map[String, OrderBook], los: Map[String, LoanOrderBook])
+case class InsertData(timestamp: Long, t: Map[String, BigDecimal],
+                      obs: Map[String, OrderBook], lobs: Map[String, LoanOrderBook])
 
-case class UpsertCandleChartData(timestamp: Long, cds: Map[String, Option[ChartDataCandle]])
+case class UpsertChartData(timestamp: Long, cds: Map[String, Option[ChartData]])
 
-case class OldCandleChartData(cds: Map[Long, Map[String, ChartDataCandle]])
+case class OldChartData(cds: Map[Long, Map[String, ChartData]])
 
 case object ListAllCurrencies
 
@@ -114,7 +114,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     }
   }
 
-  def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Seq[ChartDataCandle]]] = {
+  def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Seq[ChartData]]] = {
     val requests = for (c <- allCurrencies) yield
       RequestBuilding.Get(
         s"/public?command=returnChartData&currencyPair=$c&start=$start&end=$end&period=300"
@@ -125,8 +125,8 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
-              Unmarshal(response.entity).to[Seq[ChartDataCandleJson]].map(cdjSeq =>
-                c -> cdjSeq.map(j => ChartDataCandle(j.date, j.open, j.high, j.low, j.close, j.volume)))
+              Unmarshal(response.entity).to[Seq[ChartDataJson]].map(cdjSeq =>
+                c -> cdjSeq.map(j => ChartData(j.date, j.open, j.high, j.low, j.close, j.volume)))
             case _ =>
               Unmarshal(response.entity).to[String].flatMap { entity =>
                 val error = s"Poloniex chart data request for currency $c failed with status code ${response.status} and entity $entity"
@@ -139,12 +139,12 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
           log.error(e, "Poloniex chart data request failed")
           Future.failed(e)
       }
-      .runFold(Map.empty[String, Seq[ChartDataCandle]]) { case (m, (c, lob)) =>
+      .runFold(Map.empty[String, Seq[ChartData]]) { case (m, (c, lob)) =>
         m + (c -> lob)
       }
   }
 
-  def fetchChartDataAsNestedMap(start: Long, end: Long): Future[Map[Long, Map[String, ChartDataCandle]]] = {
+  def fetchChartDataAsNestedMap(start: Long, end: Long): Future[Map[Long, Map[String, ChartData]]] = {
     fetchChartData(start, end).map(_.toSeq.flatMap { case (c, cdSeq) =>
       cdSeq.map(cdc => (c, cdc))
     }.groupBy(_._2.timestamp).map { case (timestamp, candles) =>
@@ -249,7 +249,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
         obs <- fetchOrderBooks()
         los <- fetchLoanOrders()
       } yield {
-        s ! InsertCandles(timestamp, ts, obs, los)
+        s ! InsertData(timestamp, ts, obs, los)
       }
 
       insertCandles onFailure { case e =>
@@ -267,7 +267,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
             case (c, candle) if candle.timestamp == timestamp => c -> Some(candle)
             case (c, candle) => c -> None
           }
-          s ! UpsertCandleChartData(timestamp, candleOptions)
+          s ! UpsertChartData(timestamp, candleOptions)
         case Failure(e) =>
           log.error(e, "Poloniex chart data update failed")
       }
@@ -275,7 +275,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     case FetchOldChartData(start, end) =>
       val s = sender
       fetchChartDataAsNestedMap(start, end).map { cds =>
-        OldCandleChartData(cds)
+        OldChartData(cds)
       } pipeTo s
 
     case ListAllCurrencies =>
