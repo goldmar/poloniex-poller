@@ -32,7 +32,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
   implicit val materializer = ActorMaterializer(materializerSettings)
 
-  implicit val timeout = Timeout(1 minute)
+  implicit val timeout = Timeout(5 minute)
 
   val poller = system.actorOf(Props[PoloniexPollerActor])
 
