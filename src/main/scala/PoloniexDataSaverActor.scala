@@ -60,10 +60,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
   override def receive = {
     case Poll =>
-      poller ! Poll
-
-    case UpdateCurrencyList =>
       poller ! UpdateCurrencyList
+      poller ! Poll
 
     case InsertData(timestamp, ts, obs, lobs) =>
       val inserts = for (c <- ts.keys) yield {

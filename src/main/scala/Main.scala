@@ -37,7 +37,6 @@ object Main extends App with Service {
   val poloniexDataSaver = system.actorOf(Props[PoloniexDataSaverActor])
 
   scheduler.schedule("PollEvery5Minutes", poloniexDataSaver, Poll)
-  scheduler.schedule("UpdateCurrenciesEveryHour", poloniexDataSaver, UpdateCurrencyList)
   scheduler.schedule("UpdateOldCandlesEveryHour", poloniexDataSaver, RequestScheduledUpdateOldChartData)
 
   val now = Instant.now
