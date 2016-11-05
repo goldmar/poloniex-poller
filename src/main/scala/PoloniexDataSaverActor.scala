@@ -82,7 +82,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           low = None,
           close = None,
           volume = None,
-          chartDataFinal = false,
+          chartDataFinal = bidAskMidpoint == 0, // cope with new currencies
           bidAskMidpoint = Some(bidAskMidpoint),
           bidPriceAvg1 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 1).map(_ / bidAskMidpoint - 1),
           bidPriceAvg5 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 5).map(_ / bidAskMidpoint - 1),
@@ -217,47 +217,40 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       val query = ticks
         .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
         .sortBy(_.timestamp.asc)
-        .map(_.timestamp)
-        .take(1)
+        .map(t => (t.timestamp, t.currencyPair))
 
-      DB.get.run(query.result.headOption).map {
-        case Some(timestamp) =>
-          val start = timestamp.toInstant.getEpochSecond
-          val end = until
+      DB.get.run(query.result).foreach { case seq =>
+        if (seq.nonEmpty) {
+          log.info("Updating chart data of old candles")
+        } else {
+          log.info("All chart data is up-to-date")
+        }
 
-          log.info(s"Updating old candles since $start")
-
+        seq.grouped(288).foreach { group =>
+          val start = group.head._1.toInstant.getEpochSecond
+          val end = group.last._1.toInstant.getEpochSecond
           (poller ? FetchOldChartData(start, end)).mapTo[OldChartData] onSuccess { case OldChartData(cds) =>
-            val query = ticks
-              .filter(t => t.timestamp <= untilSqlTimestamp && t.chartDataFinal === false)
-              .sortBy(_.timestamp.asc)
-              .map(t => (t.timestamp, t.currencyPair))
-
-            DB.get.run(query.result).foreach { r =>
-              val tuples = r.map { case (sqlTimestamp, c) =>
-                val timestamp = sqlTimestamp.toInstant.getEpochSecond
-                cds.get(timestamp).flatMap(_.get(c)) match {
-                  case Some(candle) =>
-                    (timestamp, c, Some(candle))
-                  case None =>
-                    (timestamp, c, None)
-                }
-              }
-
-              val candles = tuples.groupBy(_._1).map { case (t, subTuple) =>
-                t -> subTuple.groupBy(_._2).map { case (c, subSubTuple) =>
-                  c -> subSubTuple.head._3
-                }
-              }
-
-              for (t <- candles.keys.toSeq.sorted) {
-                self ! UpsertChartData(t, candles(t))
+            val tuples = group.map { case (sqlTimestamp, c) =>
+              val timestamp = sqlTimestamp.toInstant.getEpochSecond
+              cds.get(timestamp).flatMap(_.get(c)) match {
+                case Some(candle) =>
+                  (timestamp, c, Some(candle))
+                case None =>
+                  (timestamp, c, None)
               }
             }
-          }
 
-        case None =>
-          log.info("All candles are up-to-date")
+            val candles = tuples.groupBy(_._1).map { case (t, subTuple) =>
+              t -> subTuple.groupBy(_._2).map { case (c, subSubTuple) =>
+                c -> subSubTuple.head._3
+              }
+            }
+
+            for (t <- candles.keys.toSeq.sorted) {
+              self ! UpsertChartData(t, candles(t))
+            }
+          }
+        }
       }
 
     case RequestInsertOldChartData(fromOption, until) =>
@@ -289,4 +282,5 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         }
       }
   }
+
 }
