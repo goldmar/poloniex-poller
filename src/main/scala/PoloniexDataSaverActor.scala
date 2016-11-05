@@ -170,42 +170,42 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               tickOption.flatMap(tick =>
                 tick.close.map(previousClose =>
                   ChartData(timestamp, previousClose, previousClose, previousClose, previousClose, 0))))
-        }).map { cdOption =>
-          for {
-            rowsAffected <- ticks
-              .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
-              .map(t =>
-                (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
-              .update(
-                cdOption.map(_.open), cdOption.map(_.high), cdOption.map(_.low),
-                cdOption.map(_.close), cdOption.map(_.volume), cdOption.map(_ => true).getOrElse(false))
-            result <- rowsAffected match {
-              case 0 => ticks += Tick.empty().copy(
-                timestamp = sqlTimestamp,
-                currencyPair = c,
-                open = cdOption.map(_.open),
-                high = cdOption.map(_.high),
-                low = cdOption.map(_.low),
-                close = cdOption.map(_.close),
-                volume = cdOption.map(_.volume),
-                chartDataFinal = cdOption.map(_ => true).getOrElse(false))
-              case 1 => DBIO.successful(1)
-              case n => DBIO.failed(new RuntimeException(
-                s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
-            }
-          } yield result
+        }).map {
+          case Some(cd) =>
+            for {
+              rowsAffected <- ticks
+                .filter(t => t.timestamp === sqlTimestamp && t.currencyPair === c && t.chartDataFinal === false)
+                .map(t => (t.open, t.high, t.low, t.close, t.volume, t.chartDataFinal))
+                .update(Some(cd.open), Some(cd.high), Some(cd.low), Some(cd.close), Some(cd.volume), true)
+              result <- rowsAffected match {
+                case 0 => ticks += Tick.empty().copy(
+                  timestamp = sqlTimestamp,
+                  currencyPair = c,
+                  open = Some(cd.open),
+                  high = Some(cd.high),
+                  low = Some(cd.low),
+                  close = Some(cd.close),
+                  volume = Some(cd.volume),
+                  chartDataFinal = true)
+                case 1 => DBIO.successful(1)
+                case n => DBIO.failed(new RuntimeException(
+                  s"Expected 0 or 1 change, not $n at timestamp $timestamp for currency pair $c"))
+              }
+            } yield result
+          case None =>
+            DBIO.successful(0)
         }
       })
 
-      val result = updatesFuture.map(updates =>
-        DB.get.run(DBIO.seq(updates.toSeq: _*)))
+      val result = updatesFuture.flatMap(updates =>
+        DB.get.run(DBIO.sequence(updates.toSeq)))
 
-      result onSuccess { case _ =>
-        log.info(s"Upserted candles at timestamp $timestamp")
+      result onSuccess { case seq if seq.contains(1) =>
+        log.info(s"Upserted chart data at timestamp $timestamp")
       }
 
       result onFailure { case e =>
-        log.error(e, s"Could not upsert candles at $timestamp")
+        log.error(e, s"Could not upsert chart data at $timestamp")
       }
 
     case RequestScheduledUpdateOldChartData =>
