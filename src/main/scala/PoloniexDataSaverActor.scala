@@ -209,6 +209,16 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       }
 
     case RequestScheduledUpdateOldChartData =>
+      val sqlTimestamp1DayAgo = Timestamp.from(Instant.now.minus(1, ChronoUnit.DAYS))
+      val deleteOldTicks = ticks
+        .filter(t => t.timestamp <= sqlTimestamp1DayAgo && t.chartDataFinal === false && t.bidAskMidpoint.isEmpty)
+        .delete
+      val finalizeOldTicks = ticks
+        .filter(t => t.timestamp <= sqlTimestamp1DayAgo && t.chartDataFinal === false && t.bidAskMidpoint.isDefined)
+        .map(_.chartDataFinal)
+        .update(true)
+      val query = deleteOldTicks andThen finalizeOldTicks
+      DB.get.run(query)
       self ! RequestUpdateOldChartData(
         Instant.now.minus(Config.updateDelay, ChronoUnit.MINUTES).getEpochSecond)
 
