@@ -138,8 +138,8 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
           log.error(e, "Poloniex chart data request failed")
           Future.failed(e)
       }
-      .runFold(Map.empty[String, Seq[ChartData]]) { case (m, (c, lob)) =>
-        m + (c -> lob)
+      .runFold(Map.empty[String, Seq[ChartData]]) { case (m, (c, cdSeq)) =>
+        m + (c -> cdSeq)
       }
   }
 
@@ -260,10 +260,7 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
       ).onComplete {
         case Success(cds) =>
           val candleOptions = cds.map { case (c, candleSeq) =>
-            c -> candleSeq.head
-          }.map {
-            case (c, candle) if candle.timestamp == timestamp => c -> Some(candle)
-            case (c, candle) => c -> None
+            c -> Option(candleSeq.head).filter(_.timestamp == timestamp)
           }
           s ! UpsertChartData(timestamp, candleOptions)
         case Failure(e) =>

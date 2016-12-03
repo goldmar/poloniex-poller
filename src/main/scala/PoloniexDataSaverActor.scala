@@ -83,7 +83,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           close = None,
           volume = None,
           chartDataFinal = bidAskMidpoint == 0, // cope with new currencies
-          bidAskMidpoint = Some(bidAskMidpoint),
+          bidAskMidpoint = Option(bidAskMidpoint).filter(_ > 0),
           bidPriceAvg1 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 1).map(_ / bidAskMidpoint - 1),
           bidPriceAvg5 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 5).map(_ / bidAskMidpoint - 1),
           bidPriceAvg10 = aggregateItems(bids.map(i => i.price -> i.amount * bidAskMidpoint), 10).map(_ / bidAskMidpoint - 1),
@@ -242,12 +242,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
           (poller ? FetchOldChartData(start, end)).mapTo[OldChartData] onSuccess { case OldChartData(cds) =>
             val tuples = group.map { case (sqlTimestamp, c) =>
               val timestamp = sqlTimestamp.toInstant.getEpochSecond
-              cds.get(timestamp).flatMap(_.get(c)) match {
-                case Some(candle) =>
-                  (timestamp, c, Some(candle))
-                case None =>
-                  (timestamp, c, None)
-              }
+              (timestamp, c, cds.get(timestamp).flatMap(_.get(c)))
             }
 
             val candles = tuples.groupBy(_._1).map { case (t, subTuple) =>
