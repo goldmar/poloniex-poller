@@ -100,11 +100,10 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     ).flatMap { response =>
       response.status match {
         case OK =>
-          Unmarshal(response.entity).to[Map[String, TickerJson]].map(_.filter { case (c, t) =>
-            c.startsWith("BTC_")
-          }.map { case (c, t) =>
-            c -> BigDecimal(t.last)
-          })
+          Unmarshal(response.entity).to[Map[String, TickerJson]]
+            .map(_.filterKeys(allCurrencies.contains(_)).map { case (c, t) =>
+              c -> BigDecimal(t.last)
+            })
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex ticker request failed with status code ${response.status} and entity $entity"
           log.error(error)
@@ -160,9 +159,8 @@ class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
     ).flatMap { response =>
       response.status match {
         case OK =>
-          Unmarshal(response.entity).to[Map[String, OrderBook]].map(_.filter { case (c, ob) =>
-            c.startsWith("BTC_")
-          })
+          Unmarshal(response.entity).to[Map[String, OrderBook]]
+            .map(_.filterKeys(allCurrencies.contains(_)))
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex order book request failed with status code ${response.status} and entity $entity"
           log.error(error)
