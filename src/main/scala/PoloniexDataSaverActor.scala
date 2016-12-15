@@ -48,10 +48,8 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       i += 1
     }
 
-    remaining match {
-      case r if r == 0 => Some(acc)
-      case _ => None
-    }
+    if (remaining == 0) Some(acc)
+    else None
   }
 
   def aggregateLoanOffers(c: String, lobs: Map[String, LoanOrderBook], btcPrice: BigDecimal, depth: BigDecimal): Option[BigDecimal] = {
