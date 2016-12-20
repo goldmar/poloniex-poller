@@ -72,7 +72,7 @@ trait Service extends JsonProtocols {
 
   case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
-  def streamCSV(query: Query[Ticks, Tick, Seq], special: Boolean): ToResponseMarshallable = {
+  def streamCSV(query: Query[Ticks, Tick, Seq], since: Timestamp, special: Boolean): ToResponseMarshallable = {
     val tickPublisher = DB.get.stream(
       query.result.withStatementParameters(statementInit = DB.enableStream))
 
@@ -97,14 +97,17 @@ trait Service extends JsonProtocols {
                 nextVolume.getOrElse(0),
                 Vector(TickInstantVolume(nextInstant, nextVolume)))
           }
-      }.drop(1).map { case (tick, weekIsFull, currencyPair, volumeSum, window) =>
-      (weekIsFull, window.flatMap(_.volume).length) match {
-        case (true, l) if l > 0 => (tick, Some(volumeSum / l))
-        case _ => (tick, None)
       }
-    }.filter { case (tick, _) =>
-      tick.bidAskMidpoint.nonEmpty
-    }
+      .drop(1)
+      .map { case (tick, weekIsFull, currencyPair, volumeSum, window) =>
+        (weekIsFull, window.flatMap(_.volume).length) match {
+          case (true, l) if l > 0 => (tick, Some(volumeSum / l))
+          case _ => (tick, None)
+        }
+      }
+      .filter { case (tick, _) =>
+        tick.timestamp.compareTo(since) >= 0 && tick.bidAskMidpoint.nonEmpty
+      }
 
     val csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
       CSVTick.fromTick(tick).copy(
@@ -116,25 +119,23 @@ trait Service extends JsonProtocols {
           } yield loanOfferAmountSum / avgVolume)
     }
 
-    special match {
-      case false =>
-        val headerSource = Source.single(CSVLine(csvHeader))
-        val csvLineSource = csvTickSource.map(t => CSVLine(t.toCSV()))
-        Source.combine(headerSource, csvLineSource)(Concat(_))
-      case true =>
-        implicit val converter = germanTimestampConverter
-        val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
-        val specialCSVLineSource = csvTickSource.map {
-          case tick if tick.volume.getOrElse(BigDecimal(0)) > 0 =>
-            CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
-          case tick =>
-            CSVLine(SpecialCSVTick.fromTick(tick.copy(
-              open = None, high = None, low = None, close = None
-            )).toCSV())
-        }
-        Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
+    if (special) {
+      implicit val converter = germanTimestampConverter
+      val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
+      val specialCSVLineSource = csvTickSource.map {
+        case tick if tick.volume.getOrElse(BigDecimal(0)) > 0 =>
+          CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
+        case tick =>
+          CSVLine(SpecialCSVTick.fromTick(tick.copy(
+            open = None, high = None, low = None, close = None
+          )).toCSV())
+      }
+      Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
+    } else {
+      val headerSource = Source.single(CSVLine(csvHeader))
+      val csvLineSource = csvTickSource.map(t => CSVLine(t.toCSV()))
+      Source.combine(headerSource, csvLineSource)(Concat(_))
     }
-
   }
 
   val routes = {
@@ -143,29 +144,35 @@ trait Service extends JsonProtocols {
         pathPrefix("csv") {
           pathSingleSlash {
             get {
-              complete("")
-              parameters(
-                Symbol("special") ? false) { special =>
+              parameters('since ? 0L, 'special ? false) { (since, special) =>
                 complete {
+                  val instant = Instant.ofEpochSecond(since)
+                  val timestamp = Timestamp.from(instant)
+                  val oneWeekAgo = Timestamp.from(instant.minus(7, ChronoUnit.DAYS))
                   val query = ticks
-                    .filter(t => t.chartDataFinal === true)
+                    .filter(t => t.timestamp >= oneWeekAgo && t.chartDataFinal === true)
                     .sortBy(t => (t.currencyPair.asc, t.timestamp.asc))
 
-                  streamCSV(query, special)
+                  streamCSV(query, timestamp, special)
                 }
               }
             }
           } ~
           path(Segment) { currencyPair =>
             get {
-              parameters(
-                Symbol("special") ? false) { special =>
+              parameters('since ? 0L, 'special ? false) { (since, special) =>
                 complete {
+                  val instant = Instant.ofEpochSecond(since)
+                  val timestamp = Timestamp.from(instant)
+                  val oneWeekAgo = Timestamp.from(instant.minus(7, ChronoUnit.DAYS))
                   val query = ticks
-                    .filter(t => t.currencyPair === currencyPair && t.chartDataFinal === true)
+                    .filter(t =>
+                      t.currencyPair === currencyPair &&
+                        t.timestamp >= oneWeekAgo &&
+                        t.chartDataFinal === true)
                     .sortBy(_.timestamp.asc)
 
-                  streamCSV(query, special)
+                  streamCSV(query, timestamp, special)
                 }
               }
             }
