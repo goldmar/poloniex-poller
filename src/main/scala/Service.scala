@@ -3,17 +3,16 @@ import java.time._
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import slick.jdbc.MySQLProfile.api._
-import slick.sql.SqlStreamingAction
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshallable}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.ExceptionHandler
+import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshallable}
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.util.ByteString
@@ -39,10 +38,13 @@ trait Service extends JsonProtocols {
         complete(BadRequest -> msg)
     }
 
-  implicit def csvMarshaller: Marshaller[Source[CSVLine, NotUsed], HttpEntity.Chunked] =
-    Marshaller.withFixedContentType(ContentTypes.`text/csv(UTF-8)`) { source: Source[CSVLine, NotUsed] =>
-      HttpEntity.Chunked.fromData(ContentTypes.`text/csv(UTF-8)`, source.map(l => ByteString(l.line + "\n")))
+  implicit val csvMarshaller =
+    Marshaller.withFixedContentType[CSVLine, ByteString](ContentTypes.`text/csv(UTF-8)`) {
+      case CSVLine(line) => ByteString(line)
     }
+
+  implicit val csvStreamingSupport = EntityStreamingSupport.csv()
+    .withParallelMarshalling(parallelism = 8, unordered = false)
 
   val csvHeader = {
     import shapeless._
