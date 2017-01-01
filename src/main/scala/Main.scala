@@ -5,8 +5,8 @@ import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import scala.language.postfixOps
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-
-import slick.jdbc.MySQLProfile.api._
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 import slick.jdbc.meta.MTable
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
@@ -15,7 +15,6 @@ import akka.stream._
 import com.typesafe.akka.extension.quartz.QuartzSchedulerExtension
 import com.typesafe.config.ConfigFactory
 import net.ceedubs.ficus.Ficus._
-
 import Schema._
 
 object Main extends App with Service {
@@ -80,9 +79,8 @@ object Config {
 }
 
 object DB {
-  private val db = Database.forConfig("db")
-
-  def get = db
+  val config = DatabaseConfig.forConfig[JdbcProfile]("database")
+  val get = config.db
 
   /**
     * Use this for streaming from a MySQL database

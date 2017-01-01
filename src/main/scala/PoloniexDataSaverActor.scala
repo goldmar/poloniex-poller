@@ -6,13 +6,13 @@ import scala.language.postfixOps
 import scala.concurrent._
 import scala.concurrent.duration._
 
-import slick.jdbc.MySQLProfile.api._
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.pattern.ask
 import akka.stream._
 import akka.util.Timeout
 import sext._
 import Schema._
+import DB.config.profile.api._
 
 case class RequestUpdateOldChartData(until: Long)
 

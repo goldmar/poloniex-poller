@@ -1,10 +1,10 @@
 import java.sql.Timestamp
 import java.time._
 
-import slick.jdbc.MySQLProfile.api._
 import shapeless.{Generic, HList, HNil}
 import slick.sql.SqlProfile.ColumnOption.SqlType
 import slickless._
+import DB.config.profile.api._
 
 object Schema {
 

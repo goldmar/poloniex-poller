@@ -4,7 +4,6 @@ import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 
 import scala.concurrent.ExecutionContextExecutor
-import slick.jdbc.MySQLProfile.api._
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model._
@@ -21,6 +20,7 @@ import purecsv.safe.converter.StringConverter
 import JsonProtocols._
 import CSVStringConverters._
 import Schema._
+import DB.config.profile.api._
 
 import scala.util.Try
 
