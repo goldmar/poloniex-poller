@@ -13,27 +13,28 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= {
-  val akkaV       = "2.4.10"
-  val slickV      = "3.2.0-M1"
+  val akkaV       = "2.4.16"
+  val akkaHttpV   = "10.0.1"
+  val slickV      = "3.2.0-M2"
   Seq(
     "com.typesafe.akka"        %% "akka-actor" % akkaV,
     "com.typesafe.akka"        %% "akka-stream" % akkaV,
-    "com.typesafe.akka"        %% "akka-http-experimental" % akkaV,
-    "com.typesafe.akka"        %% "akka-http-spray-json-experimental" % akkaV,
-    "com.typesafe.akka"        %% "akka-http-testkit" % akkaV,
+    "com.typesafe.akka"        %% "akka-http" % akkaHttpV,
+    "com.typesafe.akka"        %% "akka-http-spray-json" % akkaHttpV,
+    "com.typesafe.akka"        %% "akka-http-testkit" % akkaHttpV,
     "com.typesafe.akka"        %% "akka-slf4j" % akkaV,
-    "com.enragedginger"        %% "akka-quartz-scheduler" % "1.5.0-akka-2.4.x",
+    "com.enragedginger"        %% "akka-quartz-scheduler" % "1.6.0-akka-2.4.x",
     "com.typesafe.slick"       %% "slick" % slickV,
     "com.typesafe.slick"       %% "slick-hikaricp" % slickV,
-    "com.chuusai"              %% "shapeless" % "2.3.1",
-    "io.underscore"            %% "slickless" % "0.2.1",
-    "codes.reactive"           %% "scala-time" % "0.4.0",
-    "com.iheart"               %% "ficus" % "1.2.3",
-    "com.github.melrief"       %% "purecsv" % "0.0.6",
+    "com.chuusai"              %% "shapeless" % "2.3.2",
+    "io.underscore"            %% "slickless" % "0.3.0",
+    "codes.reactive"           %% "scala-time" % "0.4.1",
+    "com.iheart"               %% "ficus" % "1.4.0",
+    "com.github.melrief"       %% "purecsv" % "0.0.7",
     "com.github.nikita-volkov" %  "sext" % "0.2.4",
-    "mysql"                    % "mysql-connector-java" % "5.1.39",
-    "ch.qos.logback"           % "logback-classic" % "1.1.6",
-    "org.scalatest"            %% "scalatest" % "2.2.6" % "test"
+    "mysql"                    % "mysql-connector-java" % "5.1.40",
+    "ch.qos.logback"           % "logback-classic" % "1.1.8",
+    "org.scalatest"            %% "scalatest" % "3.0.1" % "test"
   )
 }
 
