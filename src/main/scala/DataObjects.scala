@@ -28,7 +28,7 @@ case class LoanOrderBookJson(offers: Seq[LoanOrderBookItemJson], demands: Seq[Lo
 
 case class LoanOrderBookItemJson(rate: String, amount: String, rangeMin: Int, rangeMax: Int)
 
-trait JsonProtocols extends DefaultJsonProtocol {
+object JsonProtocols extends DefaultJsonProtocol {
   implicit val tickerJsonFormat = jsonFormat2(TickerJson.apply)
   implicit val chartdataCandleJsonFormat = jsonFormat6(ChartDataJson.apply)
   implicit val orderBookJsonFormat = jsonFormat3(OrderBookJson.apply)

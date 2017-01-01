@@ -18,16 +18,15 @@ import akka.stream.scaladsl._
 import akka.util.ByteString
 import purecsv.safe._
 import purecsv.safe.converter.StringConverter
+import JsonProtocols._
 import CSVStringConverters._
 import Schema._
 
 import scala.util.Try
 
-trait Service extends JsonProtocols {
+trait Service {
   implicit val system: ActorSystem
-
   implicit def executor: ExecutionContextExecutor
-
   implicit val materializer: Materializer
 
   val log: LoggingAdapter

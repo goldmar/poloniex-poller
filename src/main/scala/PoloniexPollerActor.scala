@@ -19,6 +19,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import sext._
+import JsonProtocols._
 
 case object Poll
 
@@ -37,7 +38,7 @@ case class OldChartData(cds: Map[Long, Map[String, ChartData]])
 
 case object ListAllCurrencies
 
-class PoloniexPollerActor extends Actor with ActorLogging with JsonProtocols {
+class PoloniexPollerActor extends Actor with ActorLogging {
   implicit val system = context.system
   implicit val dispatcher = context.dispatcher
 
