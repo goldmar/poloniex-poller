@@ -18,6 +18,7 @@ import net.ceedubs.ficus.Ficus._
 import Schema._
 
 object Main extends App with Service {
+  import DB.config.profile.api._
   override implicit val system = ActorSystem()
   override implicit val executor = system.dispatcher
 
