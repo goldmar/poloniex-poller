@@ -15,8 +15,7 @@ class DataToTickSpec extends FlatSpec with Matchers {
       OrderBookItem(0.00000007, 1),
       OrderBookItem(0.00000008, 1),
       OrderBookItem(0.00000009, 100),
-      OrderBookItem(1, 10)
-    )
+      OrderBookItem(1, 10))
     val offersOption = None
 
     val tick = PoloniexDataSaverActor.dataToTick(
@@ -35,8 +34,7 @@ class DataToTickSpec extends FlatSpec with Matchers {
       OrderBookItem(0.004559, 0.24837307),
       OrderBookItem(0.004562, 1.68731409),
       OrderBookItem(0.004578, 0.47692810),
-      OrderBookItem(0.004579, 1310.63426800)
-    )
+      OrderBookItem(0.004579, 1310.63426800))
     val offersOption = None
 
     val tick = PoloniexDataSaverActor.dataToTick(
@@ -51,8 +49,7 @@ class DataToTickSpec extends FlatSpec with Matchers {
     val asks = Seq(
       OrderBookItem(0.000035, 10000),
       OrderBookItem(0.000035, 10000),
-      OrderBookItem(0.0000351, 1000000)
-    )
+      OrderBookItem(0.0000351, 1000000))
     val offersOption = None
 
     val tick = PoloniexDataSaverActor.dataToTick(
@@ -66,8 +63,7 @@ class DataToTickSpec extends FlatSpec with Matchers {
     val bids = Seq(
       OrderBookItem(0.000886, 944.2191104),
       OrderBookItem(0.00087999, 64.3342463),
-      OrderBookItem(0.000615993, 10000)
-    )
+      OrderBookItem(0.000615993, 10000))
     val asks = Seq()
     val offersOption = None
 
@@ -82,8 +78,7 @@ class DataToTickSpec extends FlatSpec with Matchers {
     val bids = Seq()
     val asks = Seq(
       OrderBookItem(0.0052, 500),
-      OrderBookItem(0.0054, 500)
-    )
+      OrderBookItem(0.0054, 500))
     val offersOption = None
 
     val tick = PoloniexDataSaverActor.dataToTick(
@@ -97,13 +92,43 @@ class DataToTickSpec extends FlatSpec with Matchers {
     val bids = Seq()
     val asks = Seq(
       OrderBookItem(0.0054, 500),
-      OrderBookItem(0.0058, 500)
-    )
+      OrderBookItem(0.0058, 500))
     val offersOption = None
 
     val tick = PoloniexDataSaverActor.dataToTick(
       timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
 
     tick.askPriceAvg5 should be(Some(0.12))
+  }
+
+  "The field bidAmountSum5percent" should "contain the correct result in test10" in {
+    val bidAskMidpoint = 100
+    val bids = Seq(
+      OrderBookItem(99, 100),
+      OrderBookItem(98, 100),
+      OrderBookItem(95, 100),
+      OrderBookItem(94.99, 100))
+    val asks = Seq()
+    val offersOption = None
+
+    val tick = PoloniexDataSaverActor.dataToTick(
+      timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
+
+    tick.bidAmountSum5percent should be(Some(29200))
+  }
+
+  "The field bidAmountSum75percent" should "contain the correct result in test11" in {
+    val bidAskMidpoint = 0.05
+    val bids = Seq(
+      OrderBookItem(0.05, 20),
+      OrderBookItem(0.01251, 20),
+      OrderBookItem(0.0125, 20))
+    val asks = Seq()
+    val offersOption = None
+
+    val tick = PoloniexDataSaverActor.dataToTick(
+      timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
+
+    tick.bidAmountSum75percent should be(Some(1.5002))
   }
 }
