@@ -158,49 +158,36 @@ case class SpecialCSVTick(datum: Timestamp,
                           bidPriceAvgAbs25: Option[BigDecimal],
                           askPriceAvgAbs5: Option[BigDecimal], askPriceAvgAbs10: Option[BigDecimal],
                           askPriceAvgAbs25: Option[BigDecimal],
-                          askAmountSumNC50percent: Option[BigDecimal], askAmountSumNC75percent: Option[BigDecimal],
-                          askAmountSumNC85percent: Option[BigDecimal])
+                          askAmountSumNC50percent: Option[BigDecimal], askAmountSumNC100percent: Option[BigDecimal],
+                          askAmountSumNC200percent: Option[BigDecimal])
 
 object SpecialCSVTick {
   def fromTick(csvTick: CSVTick): SpecialCSVTick = {
-    val bidAskMidpoint = csvTick.bidAskMidpoint
-    val bidPriceAvg5 = csvTick.bidPriceAvg5
-    val bidPriceAvg10 = csvTick.bidPriceAvg10
-    val bidPriceAvg25 = csvTick.bidPriceAvg25
-    val askPriceAvg5 = csvTick.askPriceAvg5
-    val askPriceAvg10 = csvTick.askPriceAvg10
-    val askPriceAvg25 = csvTick.askPriceAvg25
-    val bidAmountSum50percent = csvTick.bidAmountSum50percent
-    val bidAmountSum75percent = csvTick.bidAmountSum75percent
-    val bidAmountSum85percent = csvTick.bidAmountSum85percent
-    val askAmountSum50percent = csvTick.askAmountSum50percent
-    val askAmountSum75percent = csvTick.askAmountSum75percent
-    val askAmountSum85percent = csvTick.askAmountSum85percent
-
-    SpecialCSVTick(datum = csvTick.timestamp, currencyPair = csvTick.currencyPair,
+    SpecialCSVTick(
+      datum = csvTick.timestamp, currencyPair = csvTick.currencyPair,
       open = csvTick.open.map(_ * 1000), high = csvTick.high.map(_ * 1000),
       low = csvTick.low.map(_ * 1000), close = csvTick.close.map(_ * 1000),
       volume = csvTick.volume, volumeDailyAvgPast7Days = csvTick.volumeAvgPast7Days.map(_ * 288),
-      bidAskMidpoint = bidAskMidpoint.map(_ * 1000),
-      bidPriceAvg1 = csvTick.bidPriceAvg1.map(_ * 100), bidPriceAvg5 = bidPriceAvg5.map(_ * 100),
-      bidPriceAvg10 = bidPriceAvg10.map(_ * 100), bidPriceAvg25 = bidPriceAvg25.map(_ * 100),
+      bidAskMidpoint = csvTick.bidAskMidpoint.map(_ * 1000),
+      bidPriceAvg1 = csvTick.bidPriceAvg1.map(_ * 100), bidPriceAvg5 = csvTick.bidPriceAvg5.map(_ * 100),
+      bidPriceAvg10 = csvTick.bidPriceAvg10.map(_ * 100), bidPriceAvg25 = csvTick.bidPriceAvg25.map(_ * 100),
       bidPriceAvg50 = csvTick.bidPriceAvg50.map(_ * 100), bidPriceAvg100 = csvTick.bidPriceAvg100.map(_ * 100),
       bidPriceAvg500 = csvTick.bidPriceAvg500.map(_ * 100), bidPriceAvg1000 = csvTick.bidPriceAvg1000.map(_ * 100),
       bidPriceAvg2500 = csvTick.bidPriceAvg2500.map(_ * 100), bidPriceAvg5000 = csvTick.bidPriceAvg5000.map(_ * 100),
       bidPriceAvg10000 = csvTick.bidPriceAvg10000.map(_ * 100),
-      askPriceAvg1 = csvTick.askPriceAvg1.map(_ * 100), askPriceAvg5 = askPriceAvg5.map(_ * 100),
-      askPriceAvg10 = askPriceAvg10.map(_ * 100), askPriceAvg25 = askPriceAvg25.map(_ * 100),
+      askPriceAvg1 = csvTick.askPriceAvg1.map(_ * 100), askPriceAvg5 = csvTick.askPriceAvg5.map(_ * 100),
+      askPriceAvg10 = csvTick.askPriceAvg10.map(_ * 100), askPriceAvg25 = csvTick.askPriceAvg25.map(_ * 100),
       askPriceAvg50 = csvTick.askPriceAvg50.map(_ * 100), askPriceAvg100 = csvTick.askPriceAvg100.map(_ * 100),
       askPriceAvg500 = csvTick.askPriceAvg500.map(_ * 100), askPriceAvg1000 = csvTick.askPriceAvg1000.map(_ * 100),
       askPriceAvg2500 = csvTick.askPriceAvg2500.map(_ * 100), askPriceAvg5000 = csvTick.askPriceAvg5000.map(_ * 100),
       askPriceAvg10000 = csvTick.askPriceAvg10000.map(_ * 100),
       bidAmountSum5percent = csvTick.bidAmountSum5percent, bidAmountSum10percent = csvTick.bidAmountSum10percent,
-      bidAmountSum25percent = csvTick.bidAmountSum25percent, bidAmountSum50percent = bidAmountSum50percent,
-      bidAmountSum75percent = bidAmountSum75percent, bidAmountSum85percent = bidAmountSum85percent,
+      bidAmountSum25percent = csvTick.bidAmountSum25percent, bidAmountSum50percent = csvTick.bidAmountSum50percent,
+      bidAmountSum75percent = csvTick.bidAmountSum75percent, bidAmountSum85percent = csvTick.bidAmountSum85percent,
       bidAmountSum100percent = csvTick.bidAmountSum100percent, askAmountSum5percent = csvTick.askAmountSum5percent,
       askAmountSum10percent = csvTick.askAmountSum10percent, askAmountSum25percent = csvTick.askAmountSum25percent,
-      askAmountSum50percent = askAmountSum50percent, askAmountSum75percent = askAmountSum75percent,
-      askAmountSum85percent = askAmountSum85percent, askAmountSum100percent = csvTick.askAmountSum100percent,
+      askAmountSum50percent = csvTick.askAmountSum50percent, askAmountSum75percent = csvTick.askAmountSum75percent,
+      askAmountSum85percent = csvTick.askAmountSum85percent, askAmountSum100percent = csvTick.askAmountSum100percent,
       askAmountSum200percent = csvTick.askAmountSum200percent,
       loanOfferRateAvg1 = csvTick.loanOfferRateAvg1.map(_ * 100),
       loanOfferRateAvg5 = csvTick.loanOfferRateAvg5.map(_ * 100),
@@ -217,40 +204,40 @@ object SpecialCSVTick {
       loanOfferAmountSum = csvTick.loanOfferAmountSum,
       loanOfferAmountSumRelToDailyAvgVol = csvTick.loanOfferAmountSumRelToAvgVol.map(_ / 288),
       bidPriceAvgAbs5 = for {
-        bam <- bidAskMidpoint
-        bpa <- bidPriceAvg5
+        bam <- csvTick.bidAskMidpoint
+        bpa <- csvTick.bidPriceAvg5
       } yield bam * (1 + bpa) * 1000,
       bidPriceAvgAbs10 = for {
-        bam <- bidAskMidpoint
-        bpa <- bidPriceAvg10
+        bam <- csvTick.bidAskMidpoint
+        bpa <- csvTick.bidPriceAvg10
       } yield bam * (1 + bpa) * 1000,
       bidPriceAvgAbs25 = for {
-        bam <- bidAskMidpoint
-        bpa <- bidPriceAvg25
+        bam <- csvTick.bidAskMidpoint
+        bpa <- csvTick.bidPriceAvg25
       } yield bam * (1 + bpa) * 1000,
       askPriceAvgAbs5 = for {
-        bam <- bidAskMidpoint
-        apa <- askPriceAvg5
+        bam <- csvTick.bidAskMidpoint
+        apa <- csvTick.askPriceAvg5
       } yield bam * (1 + apa) * 1000,
       askPriceAvgAbs10 = for {
-        bam <- bidAskMidpoint
-        apa <- askPriceAvg10
+        bam <- csvTick.bidAskMidpoint
+        apa <- csvTick.askPriceAvg10
       } yield bam * (1 + apa) * 1000,
       askPriceAvgAbs25 = for {
-        bam <- bidAskMidpoint
-        apa <- askPriceAvg25
+        bam <- csvTick.bidAskMidpoint
+        apa <- csvTick.askPriceAvg25
       } yield bam * (1 + apa) * 1000,
       askAmountSumNC50percent = for {
-        bam <- bidAskMidpoint
-        aas <- askAmountSum50percent
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSum50percent
       } yield aas / bam,
-      askAmountSumNC75percent = for {
-        bam <- bidAskMidpoint
-        aas <- askAmountSum75percent
+      askAmountSumNC100percent = for {
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSum100percent
       } yield aas / bam,
-      askAmountSumNC85percent = for {
-        bam <- bidAskMidpoint
-        aas <- askAmountSum85percent
+      askAmountSumNC200percent = for {
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSum200percent
       } yield aas / bam)
   }
 }
