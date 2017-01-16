@@ -78,7 +78,8 @@ case class CSVTick(timestamp: Timestamp, currencyPair: String,
                    askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
                    askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
                    askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
-                   askAmountSum200percent: Option[BigDecimal],
+                   askAmountSum200percent: Option[BigDecimal], askAmountSum300percent: Option[BigDecimal],
+                   askAmountSum900percent: Option[BigDecimal], askAmountSumAll: Option[BigDecimal],
                    loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg5: Option[BigDecimal],
                    loanOfferRateAvg10: Option[BigDecimal], loanOfferRateAvg25: Option[BigDecimal],
                    loanOfferRateAvg50: Option[BigDecimal], loanOfferRateAvg100: Option[BigDecimal],
@@ -111,7 +112,8 @@ object CSVTick {
       askAmountSum10percent = tick.askAmountSum10percent, askAmountSum25percent = tick.askAmountSum25percent,
       askAmountSum50percent = tick.askAmountSum50percent, askAmountSum75percent = tick.askAmountSum75percent,
       askAmountSum85percent = tick.askAmountSum85percent, askAmountSum100percent = tick.askAmountSum100percent,
-      askAmountSum200percent = tick.askAmountSum200percent,
+      askAmountSum200percent = tick.askAmountSum200percent, askAmountSum300percent = tick.askAmountSum300percent,
+      askAmountSum900percent = tick.askAmountSum900percent, askAmountSumAll = tick.askAmountSumAll,
       loanOfferRateAvg1 = tick.loanOfferRateAvg1, loanOfferRateAvg5 = tick.loanOfferRateAvg5,
       loanOfferRateAvg10 = tick.loanOfferRateAvg10, loanOfferRateAvg25 = tick.loanOfferRateAvg25,
       loanOfferRateAvg50 = tick.loanOfferRateAvg50, loanOfferRateAvg100 = tick.loanOfferRateAvg100,
@@ -145,7 +147,8 @@ case class SpecialCSVTick(datum: Timestamp,
                           askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
                           askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
                           askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
-                          askAmountSum200percent: Option[BigDecimal],
+                          askAmountSum200percent: Option[BigDecimal], askAmountSum300percent: Option[BigDecimal],
+                          askAmountSum900percent: Option[BigDecimal], askAmountSumAll: Option[BigDecimal],
                           loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg5: Option[BigDecimal],
                           loanOfferRateAvg10: Option[BigDecimal], loanOfferRateAvg25: Option[BigDecimal],
                           loanOfferRateAvg50: Option[BigDecimal], loanOfferRateAvg100: Option[BigDecimal],
@@ -159,7 +162,8 @@ case class SpecialCSVTick(datum: Timestamp,
                           askPriceAvgAbs5: Option[BigDecimal], askPriceAvgAbs10: Option[BigDecimal],
                           askPriceAvgAbs25: Option[BigDecimal],
                           askAmountSumNC50percent: Option[BigDecimal], askAmountSumNC100percent: Option[BigDecimal],
-                          askAmountSumNC200percent: Option[BigDecimal])
+                          askAmountSumNC200percent: Option[BigDecimal], askAmountSumNC300percent: Option[BigDecimal],
+                          askAmountSumNC900percent: Option[BigDecimal], askAmountSumNCAll: Option[BigDecimal])
 
 object SpecialCSVTick {
   def fromTick(csvTick: CSVTick): SpecialCSVTick = {
@@ -188,7 +192,8 @@ object SpecialCSVTick {
       askAmountSum10percent = csvTick.askAmountSum10percent, askAmountSum25percent = csvTick.askAmountSum25percent,
       askAmountSum50percent = csvTick.askAmountSum50percent, askAmountSum75percent = csvTick.askAmountSum75percent,
       askAmountSum85percent = csvTick.askAmountSum85percent, askAmountSum100percent = csvTick.askAmountSum100percent,
-      askAmountSum200percent = csvTick.askAmountSum200percent,
+      askAmountSum200percent = csvTick.askAmountSum200percent, askAmountSum300percent = csvTick.askAmountSum300percent,
+      askAmountSum900percent = csvTick.askAmountSum900percent, askAmountSumAll = csvTick.askAmountSumAll,
       loanOfferRateAvg1 = csvTick.loanOfferRateAvg1.map(_ * 100),
       loanOfferRateAvg5 = csvTick.loanOfferRateAvg5.map(_ * 100),
       loanOfferRateAvg10 = csvTick.loanOfferRateAvg10.map(_ * 100),
@@ -238,6 +243,18 @@ object SpecialCSVTick {
       askAmountSumNC200percent = for {
         bam <- csvTick.bidAskMidpoint
         aas <- csvTick.askAmountSum200percent
+      } yield aas / bam,
+        askAmountSumNC300percent = for {
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSum300percent
+      } yield aas / bam,
+        askAmountSumNC900percent = for {
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSum900percent
+      } yield aas / bam,
+        askAmountSumNCAll = for {
+        bam <- csvTick.bidAskMidpoint
+        aas <- csvTick.askAmountSumAll
       } yield aas / bam)
   }
 }

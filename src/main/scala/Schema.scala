@@ -104,6 +104,12 @@ object Schema {
 
     def askAmountSum200percent = column[Option[BigDecimal]]("ask_amount_sum_200percent", O.SqlType("DECIMAL(20,8)"))
 
+    def askAmountSum300percent = column[Option[BigDecimal]]("ask_amount_sum_300percent", O.SqlType("DECIMAL(20,8)"))
+
+    def askAmountSum900percent = column[Option[BigDecimal]]("ask_amount_sum_900percent", O.SqlType("DECIMAL(20,8)"))
+
+    def askAmountSumAll = column[Option[BigDecimal]]("ask_amount_sum_all", O.SqlType("DECIMAL(20,8)"))
+
     def loanOfferRateAvg1 = column[Option[BigDecimal]]("loan_offer_rate_avg_1", O.SqlType("DECIMAL(20,8)"))
 
     def loanOfferRateAvg5 = column[Option[BigDecimal]]("loan_offer_rate_avg_5", O.SqlType("DECIMAL(20,8)"))
@@ -147,6 +153,7 @@ object Schema {
         bidAmountSum75percent :: bidAmountSum85percent :: bidAmountSum100percent ::
         askAmountSum5percent :: askAmountSum10percent :: askAmountSum25percent :: askAmountSum50percent ::
         askAmountSum75percent :: askAmountSum85percent :: askAmountSum100percent :: askAmountSum200percent ::
+        askAmountSum300percent :: askAmountSum900percent :: askAmountSumAll ::
         loanOfferRateAvg1 :: loanOfferRateAvg5 :: loanOfferRateAvg10 :: loanOfferRateAvg25 :: loanOfferRateAvg50 ::
         loanOfferRateAvg100 :: loanOfferRateAvg500 :: loanOfferRateAvg1000 :: loanOfferRateAvg2500 ::
         loanOfferRateAvg5000 :: loanOfferRateAvg10000 :: loanOfferRateAvgAll :: loanOfferAmountSum :: HNil) <> (
@@ -180,7 +187,8 @@ object Schema {
                   askAmountSum10percent: Option[BigDecimal], askAmountSum25percent: Option[BigDecimal],
                   askAmountSum50percent: Option[BigDecimal], askAmountSum75percent: Option[BigDecimal],
                   askAmountSum85percent: Option[BigDecimal], askAmountSum100percent: Option[BigDecimal],
-                  askAmountSum200percent: Option[BigDecimal],
+                  askAmountSum200percent: Option[BigDecimal], askAmountSum300percent: Option[BigDecimal],
+                  askAmountSum900percent: Option[BigDecimal], askAmountSumAll: Option[BigDecimal],
                   loanOfferRateAvg1: Option[BigDecimal], loanOfferRateAvg5: Option[BigDecimal],
                   loanOfferRateAvg10: Option[BigDecimal], loanOfferRateAvg25: Option[BigDecimal],
                   loanOfferRateAvg50: Option[BigDecimal], loanOfferRateAvg100: Option[BigDecimal],
@@ -197,8 +205,7 @@ object Schema {
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
       None, None, None, None, None, None, None, None, None, None,
-      None, None, None, None, None, None, None, None, None, None
-    )
+      None, None, None, None, None, None, None, None, None, None,
+      None, None, None)
   }
-
 }
