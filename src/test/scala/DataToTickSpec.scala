@@ -131,4 +131,40 @@ class DataToTickSpec extends FlatSpec with Matchers {
 
     tick.bidAmountSum75percent should be(Some(1.5002))
   }
+
+  "The field askAmountSumNC100percent" should "contain the correct result in test12" in {
+    val bidAskMidpoint = 0.049
+    val bids = Seq()
+    val asks = Seq(
+      OrderBookItem(0.049685, 0.06682804),
+      OrderBookItem(0.05, 2),
+      OrderBookItem(0.098, 1000),
+      OrderBookItem(0.0981, 1000))
+    val offersOption = None
+
+    val specialCSVTick =
+      SpecialCSVTick.fromTick(
+        CSVTick.fromTick(
+          PoloniexDataSaverActor.dataToTick(
+            timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)))
+
+    specialCSVTick.askAmountSumNC100percent should be(Some(1002.06682804))
+  }
+
+  "The field askAmountSumNC300percent" should "contain the correct result in test13" in {
+    val bidAskMidpoint = 0.05
+    val bids = Seq()
+    val asks = Seq(
+      OrderBookItem(0.049, 100),
+      OrderBookItem(0.2, 100))
+    val offersOption = None
+
+    val specialCSVTick =
+      SpecialCSVTick.fromTick(
+        CSVTick.fromTick(
+          PoloniexDataSaverActor.dataToTick(
+            timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)))
+
+    specialCSVTick.askAmountSumNC300percent should be(Some(200))
+  }
 }
