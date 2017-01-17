@@ -1,6 +1,6 @@
 import java.sql.Timestamp
 import java.time._
-import java.time.temporal.{ChronoField, ChronoUnit}
+import java.time.temporal.ChronoUnit
 
 import scala.language.postfixOps
 import scala.concurrent._
@@ -12,8 +12,6 @@ import akka.util.Timeout
 import sext._
 import Schema._
 import DB.config.profile.api._
-
-import scala.collection.immutable.SortedSet
 
 case class RequestUpdateOldChartData(until: Long)
 
@@ -43,7 +41,10 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       poller ! Poll
 
     case InsertData(timestamp, ts, obs, lobs) =>
-      val inserts = for (currencyPair <- ts.keys) yield {
+      val btcOffersInsert = PoloniexDataSaverActor.btcOffersToTick(
+        timestamp, lobs.get("BTC_BTC").map(_.offers.toSeq))
+
+      val mainInserts = for (currencyPair <- ts.keys) yield {
         val btcPrice = ts(currencyPair)
         val bids: Seq[OrderBookItem] = obs(currencyPair).bids.toSeq
         val asks: Seq[OrderBookItem] = obs(currencyPair).asks.toSeq
@@ -56,8 +57,10 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
         PoloniexDataSaverActor.dataToTick(timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
       }
 
+      val allInserts = Iterable(btcOffersInsert) ++ mainInserts
+
       val result = DB.get.run(DBIO.seq(
-        ticks ++= inserts
+        ticks ++= allInserts
       ))
 
       result onSuccess { case _ =>
@@ -206,6 +209,30 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 }
 
 object PoloniexDataSaverActor {
+  def btcOffersToTick(timestamp: Long, offersOption: Option[Seq[LoanOrderBookItem]]) = {
+    dataToTick(timestamp, "BTC_BTC", 1, Seq(), Seq(), offersOption).copy(
+      chartDataFinal = true,
+      bidAskMidpoint = None,
+      bidAmountSum5percent = None,
+      bidAmountSum10percent = None,
+      bidAmountSum25percent = None,
+      bidAmountSum50percent = None,
+      bidAmountSum75percent = None,
+      bidAmountSum85percent = None,
+      bidAmountSum100percent = None,
+      askAmountSum5percent = None,
+      askAmountSum10percent = None,
+      askAmountSum25percent = None,
+      askAmountSum50percent = None,
+      askAmountSum75percent = None,
+      askAmountSum85percent = None,
+      askAmountSum100percent = None,
+      askAmountSum200percent = None,
+      askAmountSum300percent = None,
+      askAmountSum900percent = None,
+      askAmountSumAll = None)
+  }
+
   def dataToTick(timestamp: Long, currencyPair: String, bidAskMidpoint: BigDecimal,
                  bids: Seq[OrderBookItem], asks: Seq[OrderBookItem], offersOption: Option[Seq[LoanOrderBookItem]]) = {
     Tick(

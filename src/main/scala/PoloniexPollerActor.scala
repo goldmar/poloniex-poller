@@ -172,7 +172,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
   }
 
   def fetchLoanOrders(): Future[Map[String, LoanOrderBook]] = {
-    def convertJsonItems(lobj: Seq[LoanOrderBookItemJson]) = {
+    def convertJsonItems(lobj: Seq[LoanOrderBookItemJson]): Seq[LoanOrderBookItem] = {
       lobj.map(i => LoanOrderBookItem(
         BigDecimal(i.rate),
         BigDecimal(i.amount),
