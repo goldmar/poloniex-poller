@@ -167,4 +167,51 @@ class DataToTickSpec extends FlatSpec with Matchers {
 
     specialCSVTick.askAmountSumNC300percent should be(Some(200))
   }
+
+  "The field loanOfferRateAvg1" should "contain the correct result in test14" in {
+    val bidAskMidpoint = 0.05
+    val bids = Seq()
+    val asks = Seq()
+    val offersOption = Some(Seq(
+      LoanOrderBookItem(0.005, 10, 1, 1),
+      LoanOrderBookItem(0.010, 20, 1, 1)
+    ))
+
+    val tick = PoloniexDataSaverActor.dataToTick(
+      timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
+
+    tick.loanOfferRateAvg1 should be(Some(0.0075))
+  }
+
+  "The field loanOfferRateAvg10" should "contain the correct result in test15" in {
+    val bidAskMidpoint = 0.05
+    val bids = Seq()
+    val asks = Seq()
+    val offersOption = Some(Seq(
+      LoanOrderBookItem(0.20, 10, 1, 1),
+      LoanOrderBookItem(0.50, 50, 1, 1),
+      LoanOrderBookItem(1.00, 1000, 1, 1)
+    ))
+
+    val tick = PoloniexDataSaverActor.dataToTick(
+      timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
+
+    tick.loanOfferRateAvg10 should be(Some(0.835))
+  }
+
+  "The field loanOfferRateAvg1" should "contain the correct result in test16" in {
+    val bidAskMidpoint = 0.05
+    val bids = Seq()
+    val asks = Seq()
+    val offersOption = Some(Seq(
+      LoanOrderBookItem(0.0000001, 5, 1, 1),
+      LoanOrderBookItem(0.0000002, 5, 1, 1),
+      LoanOrderBookItem(0.0000004, 1000, 1, 1)
+    ))
+
+    val tick = PoloniexDataSaverActor.dataToTick(
+      timestamp, currencyPair, bidAskMidpoint, bids, asks, offersOption)
+
+    tick.loanOfferRateAvg1 should be(Some(0.000000275))
+  }
 }
