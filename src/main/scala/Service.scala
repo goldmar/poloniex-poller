@@ -48,7 +48,7 @@ trait Service {
   val csvHeader = {
     import shapeless._
     import shapeless.ops.record._
-    val label = LabelledGeneric[CSVTick]
+    val label = LabelledGeneric[Tick]
     val keys = Keys[label.Repr].apply
     keys.toList.map(_.name).mkString(",")
   }
@@ -73,52 +73,11 @@ trait Service {
 
   case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
-  def streamCSV(query: Query[Ticks, Tick, Seq], since: Timestamp, special: Boolean): ToResponseMarshallable = {
+  def streamCSV(query: Query[Ticks, Tick, Seq], special: Boolean): ToResponseMarshallable = {
     val tickPublisher = DB.get.stream(
       query.result.withStatementParameters(statementInit = DB.enableStream))
 
-    val tickWithVolumeSource = Source.fromPublisher(tickPublisher)
-      .scan(Tick.empty(), false, "", BigDecimal(0), Vector.empty[TickInstantVolume]) {
-        case ((tick, weekIsFull, currencyPair, volumeSum, window), next) =>
-          val nextC = next.currencyPair
-          val nextInstant = next.timestamp.toInstant
-          val nextVolume = next.volume
-          val oneWeekAgo = nextInstant.minus(7, ChronoUnit.DAYS)
-          (currencyPair, window.headOption) match {
-            case (c, Some(t)) if c == nextC && t.instant.compareTo(oneWeekAgo) <= 0 =>
-              (next, true, c,
-                volumeSum - window.head.volume.getOrElse(0) + nextVolume.getOrElse(0),
-                window.tail :+ TickInstantVolume(nextInstant, nextVolume))
-            case (c, _) if c == nextC =>
-              (next, false, c,
-                volumeSum + nextVolume.getOrElse(0),
-                window :+ TickInstantVolume(nextInstant, nextVolume))
-            case _ =>
-              (next, false, nextC,
-                nextVolume.getOrElse(0),
-                Vector(TickInstantVolume(nextInstant, nextVolume)))
-          }
-      }
-      .drop(1)
-      .map { case (tick, weekIsFull, currencyPair, volumeSum, window) =>
-        (weekIsFull, window.flatMap(_.volume).length) match {
-          case (true, l) if l > 0 => (tick, Some(volumeSum / l))
-          case _ => (tick, None)
-        }
-      }
-      .filter { case (tick, _) =>
-        tick.timestamp.compareTo(since) >= 0 && tick.bidAskMidpoint.nonEmpty
-      }
-
-    val csvTickSource = tickWithVolumeSource.map { case (tick, avgVolumeOption) =>
-      CSVTick.fromTick(tick).copy(
-        volumeAvgPast7Days = avgVolumeOption,
-        loanOfferAmountSumRelToAvgVol =
-          for {
-            loanOfferAmountSum <- tick.loanOfferAmountSum
-            avgVolume <- avgVolumeOption if avgVolume > 0
-          } yield loanOfferAmountSum / avgVolume)
-    }
+    val csvTickSource = Source.fromPublisher(tickPublisher)
 
     if (special) {
       implicit val converter = germanTimestampConverter
@@ -148,13 +107,12 @@ trait Service {
               parameters('since ? 0L, 'special ? false) { (since, special) =>
                 complete {
                   val instant = Instant.ofEpochSecond(since)
-                  val timestamp = Timestamp.from(instant)
-                  val oneWeekAgo = Timestamp.from(instant.minus(7, ChronoUnit.DAYS))
+                  val sqlTimestamp = Timestamp.from(instant)
                   val query = ticks
-                    .filter(t => t.timestamp >= oneWeekAgo && t.chartDataFinal === true)
+                    .filter(t => t.timestamp >= sqlTimestamp && t.chartDataFinal === true)
                     .sortBy(t => (t.currencyPair.asc, t.timestamp.asc))
 
-                  streamCSV(query, timestamp, special)
+                  streamCSV(query, special)
                 }
               }
             }
@@ -164,16 +122,15 @@ trait Service {
               parameters('since ? 0L, 'special ? false) { (since, special) =>
                 complete {
                   val instant = Instant.ofEpochSecond(since)
-                  val timestamp = Timestamp.from(instant)
-                  val oneWeekAgo = Timestamp.from(instant.minus(7, ChronoUnit.DAYS))
+                  val sqlTimestamp = Timestamp.from(instant)
                   val query = ticks
                     .filter(t =>
                       t.currencyPair === currencyPair &&
-                        t.timestamp >= oneWeekAgo &&
+                        t.timestamp >= sqlTimestamp &&
                         t.chartDataFinal === true)
                     .sortBy(_.timestamp.asc)
 
-                  streamCSV(query, timestamp, special)
+                  streamCSV(query, special)
                 }
               }
             }

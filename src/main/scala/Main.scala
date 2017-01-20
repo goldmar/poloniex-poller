@@ -1,6 +1,5 @@
-import java.sql.SQLSyntaxErrorException
 import java.time.temporal.ChronoUnit
-import java.time.{Instant, ZoneOffset, ZonedDateTime}
+import java.time.Instant
 
 import scala.language.postfixOps
 import scala.concurrent.duration._
