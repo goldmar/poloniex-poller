@@ -83,7 +83,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     ).flatMap { response =>
       response.status match {
         case OK =>
-          Unmarshal(response.entity).to[Map[String, TickerJson]].map(_.collect {
+          Unmarshal(response.entity).to[Map[String, TickerJson]].recoverWith {
+            // see https://github.com/akka/akka-http/issues/17
+            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+          }.map(_.collect {
             case (c, t) if c.startsWith("BTC_") && t.isFrozen == "0" => c
           }.toSeq)
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
@@ -101,8 +104,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     ).flatMap { response =>
       response.status match {
         case OK =>
-          Unmarshal(response.entity).to[Map[String, TickerJson]]
-            .map(_.filterKeys(allCurrencies.contains(_)).map { case (c, t) =>
+          Unmarshal(response.entity).to[Map[String, TickerJson]]   .recoverWith {
+            // see https://github.com/akka/akka-http/issues/17
+            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+          }.map(_.filterKeys(allCurrencies.contains(_)).map { case (c, t) =>
               c -> BigDecimal(t.last)
             })
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
@@ -125,7 +130,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
-              Unmarshal(response.entity).to[Seq[ChartDataJson]].map(cdjSeq =>
+              Unmarshal(response.entity).to[Seq[ChartDataJson]].recoverWith {
+                // see https://github.com/akka/akka-http/issues/17
+                case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+              }.map(cdjSeq =>
                 c -> cdjSeq.map(j => ChartData(j.date, j.open, j.high, j.low, j.close, j.volume)))
             case _ =>
               Unmarshal(response.entity).to[String].flatMap { entity =>
@@ -160,8 +168,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     ).flatMap { response =>
       response.status match {
         case OK =>
-          Unmarshal(response.entity).to[Map[String, OrderBook]]
-            .map(_.filterKeys(allCurrencies.contains(_)))
+          Unmarshal(response.entity).to[Map[String, OrderBook]].recoverWith {
+            // see https://github.com/akka/akka-http/issues/17
+            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+          }.map(_.filterKeys(allCurrencies.contains(_)))
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex order book request failed with status code ${response.status} and entity $entity"
           log.error(error)
@@ -191,7 +201,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
-              Unmarshal(response.entity).to[LoanOrderBookJson].map { lobj =>
+              Unmarshal(response.entity).to[LoanOrderBookJson].recoverWith {
+                // see https://github.com/akka/akka-http/issues/17
+                case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+              }.map { lobj =>
                 val offers = convertJsonItems(lobj.offers)
                 val demands = convertJsonItems(lobj.demands)
                 c -> LoanOrderBook(

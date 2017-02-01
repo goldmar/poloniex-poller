@@ -21,6 +21,7 @@ import JsonProtocols._
 import CSVStringConverters._
 import Schema._
 import DB.config.profile.api._
+import slick.basic.DatabasePublisher
 
 import scala.util.Try
 
@@ -74,15 +75,15 @@ trait Service {
   case class TickInstantVolume(instant: Instant, volume: Option[BigDecimal])
 
   def streamCSV(query: Query[Ticks, Tick, Seq], special: Boolean): ToResponseMarshallable = {
-    val tickPublisher = DB.get.stream(
+    val tickPublisher: DatabasePublisher[Tick] = DB.get.stream(
       query.result.withStatementParameters(statementInit = DB.enableStream))
 
-    val csvTickSource = Source.fromPublisher(tickPublisher)
+    val tickSource = Source.fromPublisher(tickPublisher)
 
-    if (special) {
+    val csvSource = if (special) {
       implicit val converter = germanTimestampConverter
       val specialHeaderSource = Source.single(CSVLine(specialCSVHeader))
-      val specialCSVLineSource = csvTickSource.map {
+      val specialCSVLineSource = tickSource.map {
         case tick if tick.volume.getOrElse(BigDecimal(0)) > 0 =>
           CSVLine(SpecialCSVTick.fromTick(tick).toCSV())
         case tick =>
@@ -93,9 +94,11 @@ trait Service {
       Source.combine(specialHeaderSource, specialCSVLineSource)(Concat(_))
     } else {
       val headerSource = Source.single(CSVLine(csvHeader))
-      val csvLineSource = csvTickSource.map(t => CSVLine(t.toCSV()))
+      val csvLineSource = tickSource.map(t => CSVLine(t.toCSV()))
       Source.combine(headerSource, csvLineSource)(Concat(_))
     }
+
+    csvSource
   }
 
   val routes = {

@@ -25,7 +25,7 @@ object Main extends App with Service {
 
   val decider: Supervision.Decider = { e =>
     log.error("Unhandled exception in stream", e)
-    Supervision.Stop
+    Supervision.Resume
   }
 
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
