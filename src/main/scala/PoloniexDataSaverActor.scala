@@ -40,17 +40,20 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       poller ! UpdateCurrencyList
       poller ! Poll
 
-    case InsertData(timestamp, ts, obs, lobs) =>
+    case InsertData(timestamp, obs, lobs) =>
       val sqlTimestamp = Timestamp.from(Instant.ofEpochSecond(timestamp))
 
-      val btcOffersInsert = PoloniexDataSaverActor.loanOffersToTick(
+      val btcOffersInsert: Tick = PoloniexDataSaverActor.loanOffersToTick(
         tick = Tick.empty.copy(timestamp = sqlTimestamp, currencyPair = "BTC_BTC", chartDataFinal = true),
         bidAskMidpoint = 1,
         offersOption = lobs.get("BTC_BTC").map(_.offers.toSeq))
 
-      val mainInserts = (for (currencyPair <- ts.keys) yield {
-        val bids: Seq[OrderBookItem] = obs(currencyPair).bids.toSeq
-        val asks: Seq[OrderBookItem] = obs(currencyPair).asks.toSeq
+      val currencies: Seq[String] = (obs.keySet ++ lobs.keySet).toSeq.sorted
+
+      val mainInserts: Seq[Tick] = (for (currencyPair <- currencies) yield {
+        val orderBookOption: Option[OrderBook] = obs.get(currencyPair)
+        val bids: Seq[OrderBookItem] = orderBookOption.map(_.bids.toSeq) getOrElse (Seq.empty)
+        val asks: Seq[OrderBookItem] = orderBookOption.map(_.asks.toSeq) getOrElse (Seq.empty)
         val offersOption: Option[Seq[LoanOrderBookItem]] = lobs.get(currencyPair).map(_.offers.toSeq)
 
         PoloniexDataSaverActor.dataToTick(

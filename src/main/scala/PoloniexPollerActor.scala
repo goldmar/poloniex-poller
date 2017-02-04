@@ -29,8 +29,7 @@ case class UpdatedCurrencyList(cs: Seq[String])
 
 case class FetchOldChartData(start: Long, end: Long)
 
-case class InsertData(timestamp: Long, t: Map[String, BigDecimal],
-                      obs: Map[String, OrderBook], lobs: Map[String, LoanOrderBook])
+case class InsertData(timestamp: Long, obs: Map[String, OrderBook], lobs: Map[String, LoanOrderBook])
 
 case class UpsertChartData(timestamp: Long, cds: Map[String, Option[ChartData]])
 
@@ -91,27 +90,6 @@ class PoloniexPollerActor extends Actor with ActorLogging {
           }.toSeq)
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex market request failed with status code ${response.status} and entity $entity"
-          log.error(error)
-          Future.failed(new IOException(error))
-        }
-      }
-    }
-  }
-
-  def fetchTickers(): Future[Map[String, BigDecimal]] = {
-    poloniexSingleRequest(RequestBuilding.Get(
-      s"/public?command=returnTicker")
-    ).flatMap { response =>
-      response.status match {
-        case OK =>
-          Unmarshal(response.entity).to[Map[String, TickerJson]]   .recoverWith {
-            // see https://github.com/akka/akka-http/issues/17
-            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
-          }.map(_.filterKeys(allCurrencies.contains(_)).map { case (c, t) =>
-              c -> BigDecimal(t.last)
-            })
-        case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
-          val error = s"Poloniex ticker request failed with status code ${response.status} and entity $entity"
           log.error(error)
           Future.failed(new IOException(error))
         }
@@ -257,11 +235,10 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         .toEpochSecond
 
       val insertCandles = for {
-        ts <- fetchTickers()
         obs <- fetchOrderBooks()
         los <- fetchLoanOrders()
       } yield {
-        s ! InsertData(timestamp, ts, obs, los)
+        s ! InsertData(timestamp, obs, los)
       }
 
       insertCandles onFailure { case e =>
