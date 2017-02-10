@@ -43,7 +43,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
 
   val decider: Supervision.Decider = { e =>
     log.error("Unhandled exception in stream", e)
-    Supervision.Stop
+    Supervision.Resume
   }
 
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
@@ -69,6 +69,14 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     Await.result(currencies, 10 seconds)
   }
 
+  def retry[T](op: => Future[T], retries: Int): Future[T] = {
+    op recoverWith {
+      case _ if retries > 0 =>
+        log.info("Retrying operation")
+        retry(op, retries - 1)
+    }
+  }
+
   def poloniexSingleRequest(request: HttpRequest): Future[HttpResponse] = {
     Source.single(request -> "unique").via(poloniexPoolFlow).runWith(Sink.head).flatMap {
       case (Success(r: HttpResponse), _) ⇒ Future.successful(r)
@@ -84,7 +92,9 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         case OK =>
           Unmarshal(response.entity).to[Map[String, TickerJson]].recoverWith {
             // see https://github.com/akka/akka-http/issues/17
-            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+            case e =>
+              log.error(e, "Could not unmarshall market response")
+              response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
           }.map(_.collect {
             case (c, t) if c.startsWith("BTC_") && t.isFrozen == "0" => c
           }.toSeq)
@@ -110,7 +120,9 @@ class PoloniexPollerActor extends Actor with ActorLogging {
             case OK =>
               Unmarshal(response.entity).to[Seq[ChartDataJson]].recoverWith {
                 // see https://github.com/akka/akka-http/issues/17
-                case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+                case e =>
+                  log.error(e, s"Could not unmarshall chart data response for currency $c")
+                  response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
               }.map(cdjSeq =>
                 c -> cdjSeq.map(j => ChartData(j.date, j.open, j.high, j.low, j.close, j.volume)))
             case _ =>
@@ -148,7 +160,9 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         case OK =>
           Unmarshal(response.entity).to[Map[String, OrderBook]].recoverWith {
             // see https://github.com/akka/akka-http/issues/17
-            case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+            case e =>
+              log.error(e, "Could not unmarshall order book response")
+              response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
           }.map(_.filterKeys(allCurrencies.contains(_)))
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex order book request failed with status code ${response.status} and entity $entity"
@@ -168,12 +182,13 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         i.rangeMax))
     }
 
-    val requests = for (c <- Config.marginCurrencies) yield
-      RequestBuilding.Get(
-        s"/public?command=returnLoanOrders&currency=$c&limit=999999"
-      ) -> s"BTC_$c"
+    val requests: () => Iterator[(HttpRequest, String)] = () =>
+      for (c <- Config.marginCurrencies.iterator) yield
+        RequestBuilding.Get(
+          s"/public?command=returnLoanOrders&currency=$c&limit=999999"
+        ) -> s"BTC_$c"
 
-    Source(requests.to[collection.immutable.Iterable])
+    Source.fromIterator(requests)
       .via(poloniexPoolFlow)
       .mapAsyncUnordered(200) {
         case (Success(response: HttpResponse), c) =>
@@ -181,7 +196,9 @@ class PoloniexPollerActor extends Actor with ActorLogging {
             case OK =>
               Unmarshal(response.entity).to[LoanOrderBookJson].recoverWith {
                 // see https://github.com/akka/akka-http/issues/17
-                case e => response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
+                case e =>
+                  log.error(e, s"Could not unmarshall loan order book response for currency $c")
+                  response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
               }.map { lobj =>
                 val offers = convertJsonItems(lobj.offers)
                 val demands = convertJsonItems(lobj.demands)
@@ -198,7 +215,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
           }
 
         case (Failure(e), c) =>
-          log.error(e, "Poloniex loan order book request failed")
+          log.error(e, s"Poloniex loan order book request for currency $c failed")
           Future.failed(e)
       }
       .runFold(Map.empty[String, LoanOrderBook]) { case (m, (c, lob)) =>
@@ -235,8 +252,8 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         .toEpochSecond
 
       val insertCandles = for {
-        obs <- fetchOrderBooks()
-        los <- fetchLoanOrders()
+        obs <- retry(fetchOrderBooks(), 3).recover(Map())
+        los <- retry(fetchLoanOrders(), 3).recover(Map())
       } yield {
         s ! InsertData(timestamp, obs, los)
       }

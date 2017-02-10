@@ -25,7 +25,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 
   val decider: Supervision.Decider = { e =>
     log.error("Unhandled exception in stream", e)
-    Supervision.Stop
+    Supervision.Resume
   }
 
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
