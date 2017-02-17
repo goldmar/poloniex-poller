@@ -1,6 +1,6 @@
 import java.sql.Timestamp
 
-import scala.collection.immutable.{Map, Seq, SortedSet}
+import scala.collection.immutable.{Map, SortedSet}
 import spray.json.{DefaultJsonProtocol, JsValue, RootJsonReader}
 import Schema.Tick
 
@@ -18,13 +18,13 @@ case class OrderBook(asks: SortedSet[OrderBookItem], bids: SortedSet[OrderBookIt
 
 case class OrderBookItem(price: BigDecimal, amount: BigDecimal)
 
-case class OrderBookJson(asks: Seq[Seq[JsValue]], bids: Seq[Seq[JsValue]], seq: Long)
+case class OrderBookJson(asks: Vector[Vector[JsValue]], bids: Vector[Vector[JsValue]], seq: Long)
 
 case class LoanOrderBook(offers: SortedSet[LoanOrderBookItem], demands: SortedSet[LoanOrderBookItem])
 
 case class LoanOrderBookItem(rate: BigDecimal, amount: BigDecimal, rangeMin: Int, rangeMax: Int)
 
-case class LoanOrderBookJson(offers: Seq[LoanOrderBookItemJson], demands: Seq[LoanOrderBookItemJson])
+case class LoanOrderBookJson(offers: Vector[LoanOrderBookItemJson], demands: Vector[LoanOrderBookItemJson])
 
 case class LoanOrderBookItemJson(rate: String, amount: String, rangeMin: Int, rangeMax: Int)
 

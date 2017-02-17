@@ -46,15 +46,15 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       val btcOffersInsert: Tick = PoloniexDataSaverActor.loanOffersToTick(
         tick = Tick.empty.copy(timestamp = sqlTimestamp, currencyPair = "BTC_BTC", chartDataFinal = true),
         bidAskMidpoint = 1,
-        offersOption = lobs.get("BTC_BTC").map(_.offers.toSeq))
+        offersOption = lobs.get("BTC_BTC").map(_.offers.toVector))
 
-      val currencies: Seq[String] = (obs.keySet ++ lobs.keySet).toSeq.sorted
+      val currencies: Vector[String] = (obs.keySet ++ lobs.keySet).toVector.sorted
 
-      val mainInserts: Seq[Tick] = (for (currencyPair <- currencies) yield {
+      val mainInserts: Vector[Tick] = (for (currencyPair <- currencies) yield {
         val orderBookOption: Option[OrderBook] = obs.get(currencyPair)
-        val bids: Seq[OrderBookItem] = orderBookOption.map(_.bids.toSeq) getOrElse (Seq.empty)
-        val asks: Seq[OrderBookItem] = orderBookOption.map(_.asks.toSeq) getOrElse (Seq.empty)
-        val offersOption: Option[Seq[LoanOrderBookItem]] = lobs.get(currencyPair).map(_.offers.toSeq)
+        val bids: Vector[OrderBookItem] = orderBookOption.map(_.bids.toVector) getOrElse (Vector.empty)
+        val asks: Vector[OrderBookItem] = orderBookOption.map(_.asks.toVector) getOrElse (Vector.empty)
+        val offersOption: Option[Vector[LoanOrderBookItem]] = lobs.get(currencyPair).map(_.offers.toVector)
 
         PoloniexDataSaverActor.dataToTick(
           tick = Tick.empty.copy(timestamp = sqlTimestamp, currencyPair = currencyPair),
@@ -123,7 +123,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       })
 
       val result = updatesFuture.flatMap(updates =>
-        DB.get.run(DBIO.sequence(updates.toSeq)))
+        DB.get.run(DBIO.sequence(updates.toVector)))
 
       result onSuccess { case seq if seq.contains(1) =>
         log.info(s"Upserted chart data at timestamp $timestamp")
@@ -176,7 +176,7 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
               }
             }
 
-            for (t <- candles.keys.toSeq.sorted) {
+            for (t <- candles.keys.toVector.sorted) {
               self ! UpsertChartData(t, candles(t))
             }
           }
@@ -199,14 +199,14 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
       }
 
       fromFuture.foreach { from =>
-        val allCurrencies = (poller ? ListAllCurrencies).mapTo[Seq[String]]
+        val allCurrencies = (poller ? ListAllCurrencies).mapTo[Vector[String]]
         val oldChartData = (poller ? FetchOldChartData(from, until)).mapTo[OldChartData]
         for {
           allCs <- allCurrencies
           ocd <- oldChartData
         } yield {
           val cds = ocd.cds
-          for (t <- cds.keys.toSeq.sorted if t >= from && t <= until) {
+          for (t <- cds.keys.toVector.sorted if t >= from && t <= until) {
             self ! UpsertChartData(t, allCs.map(c => c -> cds(t).get(c)).toMap)
           }
         }
@@ -215,15 +215,15 @@ class PoloniexDataSaverActor extends Actor with ActorLogging {
 }
 
 object PoloniexDataSaverActor {
-  def dataToTick(tick: Tick, bids: Seq[OrderBookItem], asks: Seq[OrderBookItem],
-                 offersOption: Option[Seq[LoanOrderBookItem]]): Option[Tick] = {
+  def dataToTick(tick: Tick, bids: Vector[OrderBookItem], asks: Vector[OrderBookItem],
+                 offersOption: Option[Vector[LoanOrderBookItem]]): Option[Tick] = {
     for {
       tmpTick <- bidsAndAsksToTick(tick, bids, asks)
       bidAskMidpoint <- tmpTick.bidAskMidpoint
     } yield loanOffersToTick(tmpTick, bidAskMidpoint, offersOption)
   }
 
-  def bidsAndAsksToTick(tick: Tick, bids: Seq[OrderBookItem], asks: Seq[OrderBookItem]): Option[Tick] = {
+  def bidsAndAsksToTick(tick: Tick, bids: Vector[OrderBookItem], asks: Vector[OrderBookItem]): Option[Tick] = {
 
     val bidAskMidpointOption: Option[BigDecimal] = (for {
       bid <- bids.headOption
@@ -276,7 +276,7 @@ object PoloniexDataSaverActor {
     }
   }
 
-  def loanOffersToTick(tick: Tick, bidAskMidpoint: BigDecimal, offersOption: Option[Seq[LoanOrderBookItem]]): Tick = {
+  def loanOffersToTick(tick: Tick, bidAskMidpoint: BigDecimal, offersOption: Option[Vector[LoanOrderBookItem]]): Tick = {
     tick.copy(
       loanOfferRateAvg1 = offersOption.flatMap(offers => aggregateItems(offers.map(i => i.rate -> i.amount * bidAskMidpoint), 1)),
       loanOfferRateAvg5 = offersOption.flatMap(offers => aggregateItems(offers.map(i => i.rate -> i.amount * bidAskMidpoint), 5)),
@@ -296,14 +296,14 @@ object PoloniexDataSaverActor {
       loanOfferAmountSum = offersOption.map(offers => offers.map(_.amount).sum).map(_ * bidAskMidpoint))
   }
 
-  def aggregateItems(seq: Seq[(BigDecimal, BigDecimal)], depth: BigDecimal): Option[BigDecimal] = {
-    val size = seq.size
+  def aggregateItems(vector: Vector[(BigDecimal, BigDecimal)], depth: BigDecimal): Option[BigDecimal] = {
+    val size = vector.size
     var acc: BigDecimal = 0
     var remaining = depth
     var i = 0
     while (remaining > 0 && i < size) {
-      val amount = remaining min seq(i)._2
-      acc += amount * seq(i)._1 / depth
+      val amount = remaining min vector(i)._2
+      acc += amount * vector(i)._1 / depth
       remaining -= amount
       i += 1
     }

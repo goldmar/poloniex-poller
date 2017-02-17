@@ -25,7 +25,7 @@ case object Poll
 
 case object UpdateCurrencyList
 
-case class UpdatedCurrencyList(cs: Seq[String])
+case class UpdatedCurrencyList(cs: Vector[String])
 
 case class FetchOldChartData(start: Long, end: Long)
 
@@ -49,7 +49,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
   implicit val materializer = ActorMaterializer(materializerSettings)
 
-  var allCurrencies = Seq.empty[String]
+  var allCurrencies = Vector.empty[String]
 
   val poloniexPoolFlow: Flow[(HttpRequest, String), (Try[HttpResponse], String), HostConnectionPool] =
     Http().cachedHostConnectionPoolHttps[String]("poloniex.com")
@@ -84,7 +84,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     }
   }
 
-  def fetchMarkets(): Future[Seq[String]] = {
+  def fetchMarkets(): Future[Vector[String]] = {
     poloniexSingleRequest(RequestBuilding.Get(
       s"/public?command=returnTicker")
     ).flatMap { response =>
@@ -97,7 +97,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
               response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
           }.map(_.collect {
             case (c, t) if c.startsWith("BTC_") && t.isFrozen == "0" => c
-          }.toSeq)
+          }.toVector)
         case _ => Unmarshal(response.entity).to[String].flatMap { entity =>
           val error = s"Poloniex market request failed with status code ${response.status} and entity $entity"
           log.error(error)
@@ -107,7 +107,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
     }
   }
 
-  def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Seq[ChartData]]] = {
+  def fetchChartData(start: Long, end: Long = 9999999999L): Future[Map[String, Vector[ChartData]]] = {
     val requests = for (c <- allCurrencies) yield
       RequestBuilding.Get(
         s"/public?command=returnChartData&currencyPair=$c&start=$start&end=$end&period=300"
@@ -118,13 +118,13 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         case (Success(response: HttpResponse), c) =>
           response.status match {
             case OK =>
-              Unmarshal(response.entity).to[Seq[ChartDataJson]].recoverWith {
+              Unmarshal(response.entity).to[Vector[ChartDataJson]].recoverWith {
                 // see https://github.com/akka/akka-http/issues/17
                 case e =>
                   log.error(e, s"Could not unmarshall chart data response for currency $c")
                   response.entity.dataBytes.runWith(Sink.ignore).flatMap(_ => Future.failed(e))
-              }.map(cdjSeq =>
-                c -> cdjSeq.map(j => ChartData(j.date, j.open, j.high, j.low, j.close, j.volume)))
+              }.map(cdjVector =>
+                c -> cdjVector.map(j => ChartData(j.date, j.open, j.high, j.low, j.close, j.volume)))
             case _ =>
               Unmarshal(response.entity).to[String].flatMap { entity =>
                 val error = s"Poloniex chart data request for currency $c failed with status code ${response.status} and entity $entity"
@@ -137,14 +137,14 @@ class PoloniexPollerActor extends Actor with ActorLogging {
           log.error(e, "Poloniex chart data request failed")
           Future.failed(e)
       }
-      .runFold(Map.empty[String, Seq[ChartData]]) { case (m, (c, cdSeq)) =>
-        m + (c -> cdSeq)
+      .runFold(Map.empty[String, Vector[ChartData]]) { case (m, (c, cdVector)) =>
+        m + (c -> cdVector)
       }
   }
 
   def fetchChartDataAsNestedMap(start: Long, end: Long): Future[Map[Long, Map[String, ChartData]]] = {
-    fetchChartData(start, end).map(_.toSeq.flatMap { case (c, cdSeq) =>
-      cdSeq.map(cdc => (c, cdc))
+    fetchChartData(start, end).map(_.toVector.flatMap { case (c, cdVector) =>
+      cdVector.map(cdc => (c, cdc))
     }.groupBy(_._2.timestamp).map { case (timestamp, candles) =>
       timestamp -> candles.groupBy(_._1).map { case (c, tuples) =>
         c -> tuples.head._2
@@ -174,7 +174,7 @@ class PoloniexPollerActor extends Actor with ActorLogging {
   }
 
   def fetchLoanOrders(): Future[Map[String, LoanOrderBook]] = {
-    def convertJsonItems(lobj: Seq[LoanOrderBookItemJson]): Seq[LoanOrderBookItem] = {
+    def convertJsonItems(lobj: Vector[LoanOrderBookItemJson]): Vector[LoanOrderBookItem] = {
       lobj.map(i => LoanOrderBookItem(
         BigDecimal(i.rate),
         BigDecimal(i.amount),
@@ -267,8 +267,8 @@ class PoloniexPollerActor extends Actor with ActorLogging {
         using = system.scheduler)(fetchChartData(timestamp)
       ).onComplete {
         case Success(cds) =>
-          val candleOptions = cds.map { case (c, candleSeq) =>
-            c -> Option(candleSeq.head).filter(_.timestamp == timestamp)
+          val candleOptions = cds.map { case (c, candleVector) =>
+            c -> Option(candleVector.head).filter(_.timestamp == timestamp)
           }
           s ! UpsertChartData(timestamp, candleOptions)
         case Failure(e) =>

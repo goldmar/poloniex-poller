@@ -75,7 +75,7 @@ object Config {
   val httpInterface = config.as[String]("http.interface")
   val httpPort = config.as[Int]("http.port")
   val updateDelay = config.as[Int]("poloniex.update-delay-in-minutes")
-  val marginCurrencies = config.as[Seq[String]]("poloniex.margin-currencies")
+  val marginCurrencies = config.as[Vector[String]]("poloniex.margin-currencies")
 }
 
 object DB {
